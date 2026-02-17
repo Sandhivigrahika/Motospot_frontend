@@ -1,0 +1,211 @@
+/*
+// src/screens/HomeScreen.tsx
+import React from 'react';
+import { View, Text, Button, StyleSheet } from 'react-native';
+import { useAuth } from '../context/AuthContext';
+
+export default function HomeScreen() {
+  const { signOut } = useAuth();
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Welcome to Motospot! 🏍️</Text>
+      <Text style={styles.subtitle}>You're logged in</Text>
+      
+      <Button title="Sign Out" onPress={signOut} color="#ef4444" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#f8fafc',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 40,
+  },
+});
+
+
+
+
+*/
+
+
+
+
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
+import {useAuth} from '../context/AuthContext';
+
+const API_URL = 'https://motospotbackend-production.up.railway.app';
+
+export default function HomeScreen({navigation}: any) {
+  const [user, setUser] = useState<{name: string, phone: string} | null>(null);
+  const [myBikes, setMyBikes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { signOut, devSignIn } = useAuth();  // Last
+
+
+  useEffect(() => {
+    loadUserAndBikes();
+  }, []);
+
+  const loadUserAndBikes = async () => { 
+    try {
+      const token = await SecureStore.getItemAsync('accessToken');
+      if (!token) {
+        //token missing  = session invalid
+        await signOut();
+        return;
+      }
+
+      const storedUser = await SecureStore.getItemAsync('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+        return;
+      }
+
+      //fetchbikes endpoint
+      const bikesRes = await axios.get(`${API_URL}/user/my-bikes`, {
+        headers: {Authorization: `Bearer ${token}`}
+      });
+
+      setMyBikes(bikesRes.data.data || []);
+
+       // Refresh user if needed (your /dashboard/me/)
+      const profileRes = await axios.get(`${API_URL}/dashboard/me/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const freshUser = profileRes.data;  // Update from server
+      setUser(freshUser);
+      await SecureStore.setItemAsync('user', JSON.stringify(freshUser));
+
+
+    } catch (err:any) {
+
+      console.error('Load Error:', err.response?.data || err.message);
+      Alert.alert('Session expired', 'Logging out...');
+      await signOut();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#10b981" />
+        <Text style={styles.loadingText}>Loading your bikes...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return  (
+    <View style={styles.container}>
+      <Text>Loading…</Text>
+    </View>
+  );
+  }
+
+  const hasBikes = myBikes.length > 0;
+
+
+
+
+   return (
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Welcome, {user.name}!</Text>
+      <Text style={styles.subtitle}>Phone: {user.phone}</Text>
+
+      {!hasBikes ? (
+        // FIRST-TIME USER: Bike CTA
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>🏍️ Add Your First Bike</Text>
+          <Text style={styles.cardText}>Enter bike details to book services.</Text>
+          <TouchableOpacity style={styles.ctaButton} onPress={() => navigation.navigate('BikeAdd') }>
+            <Text style={styles.ctaText}>+ Add Bike</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // RETURNING USER: Dashboard
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Your Bikes ({myBikes.length})</Text>
+          <Text style={styles.cardText}>Ready to book service?</Text>
+          <TouchableOpacity style={styles.ctaButton}>
+            <Text style={styles.ctaText}>Book Service</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {__DEV__ && (
+        <View style={styles.devSection}>
+          <TouchableOpacity style={styles.devButton} onPress={devSignIn}>
+            <Text>🔧 Dev Login</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.devButton, styles.logoutButton]} onPress={signOut}>
+            <Text>🚪 Logout</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.devButton} onPress={loadUserAndBikes}>
+            <Text>🔄 Reload</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 24, backgroundColor: '#f8fafc' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#64748b' },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#1e293b', marginBottom: 8 },
+  subtitle: { fontSize: 18, color: '#64748b', marginBottom: 32 },
+  card: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  cardTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 8, color: '#1e293b' },
+  cardText: { fontSize: 16, color: '#64748b', marginBottom: 16 },
+  ctaButton: {
+    backgroundColor: '#10b981',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  ctaText: { color: 'white', fontSize: 18, fontWeight: '600' },
+  devSection: {
+    marginTop: 32,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  devButton: {
+    backgroundColor: '#f1f5f9',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  logoutButton: { backgroundColor: '#fee2e2' },
+});
