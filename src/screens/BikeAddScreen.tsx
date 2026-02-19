@@ -56,7 +56,7 @@ export default function BikeAddScreen({navigation}: any) {
   const [form, setForm] = useState({
     company_id: '',
     model_id: '',
-    reg_no: '',
+    registration_number: '',
     purchase_year: ''
   });
 
@@ -162,7 +162,7 @@ export default function BikeAddScreen({navigation}: any) {
   // Add Bike
   // ===============================
   const addBike = async () => {
-    if (!form.company_id || !form.model_id || !form.reg_no || !form.purchase_year) {
+    if (!form.company_id || !form.model_id || !form.registration_number || !form.purchase_year) {
       Alert.alert('Error', 'Fill all fields');
       return;
     }
@@ -181,6 +181,8 @@ export default function BikeAddScreen({navigation}: any) {
         ...form,
         fuel_type:"petrol",
       };
+
+      console.log("Bike payload being sent:", JSON.stringify(payload, null, 2));
 
       await axios.post(
         `${API_URL}/bikes/add`,
@@ -246,9 +248,9 @@ export default function BikeAddScreen({navigation}: any) {
       <TextInput
         style={styles.input}
         placeholder="Registration Number"
-        value={form.reg_no}
+        value={form.registration_number}
         onChangeText={(text) =>
-          setForm(prev => ({ ...prev, reg_no: text }))
+          setForm(prev => ({ ...prev, registration_number: text }))
         }
       />
 

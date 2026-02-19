@@ -7,6 +7,8 @@ import HomeScreen from './src/screens/HomeScreen';  // ADD YOUR HOME SCREEN
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
 import BikeAddScreen from './src/screens/BikeAddScreen';
+import AddressScreen from './src/screens/AddressScreen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +31,7 @@ function Navigation() {
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="BikeAdd" component={BikeAddScreen} />
+            <Stack.Screen name ="Address" component={AddressScreen} />
             {/* Add other authenticated screens here */}
           </>
         ) : (
@@ -45,8 +48,10 @@ function Navigation() {
 
 export default function App() {
   return (
+   <SafeAreaProvider>
     <AuthProvider>
       <Navigation />
     </AuthProvider>
+  </SafeAreaProvider>
   );
 }

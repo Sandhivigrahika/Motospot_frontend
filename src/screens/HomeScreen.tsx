@@ -46,10 +46,14 @@ const styles = StyleSheet.create({
 
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import {useAuth} from '../context/AuthContext';
+import AddressBar from '../components/AddressBar';
+import { useAddress } from '../hooks/useAddress';
+import {SafeAreaView} from 'react-native-safe-area-context';
+
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
@@ -57,25 +61,31 @@ export default function HomeScreen({navigation}: any) {
   const [user, setUser] = useState<{name: string, phone: string} | null>(null);
   const [myBikes, setMyBikes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { signOut, devSignIn } = useAuth();  // Last
+  const { signOut, devSignIn, isAuthenticated } = useAuth();  // Last
 
-
-  useEffect(() => {
-    loadUserAndBikes();
-  }, []);
+  //address hook
+  const {latestAddress, loadingAddresses, fetchAddresses} = useAddress();
 
   const loadUserAndBikes = async () => { 
     try {
       const token = await SecureStore.getItemAsync('accessToken');
       if (!token) {
         //token missing  = session invalid
-        await signOut();
+        //await signOut();
+        setLoading(false)
         return;
       }
+
+      fetchAddresses(token);
 
       const storedUser = await SecureStore.getItemAsync('user');
       if (storedUser) {
         setUser(JSON.parse(storedUser));
+
+        const bikesRes = await axios.get(`${API_URL}/user/my-bikes`, {
+          headers: { Authorization: `Bearer ${token}`},
+        });
+        setMyBikes(bikesRes.data.data || []);
         return;
       }
 
@@ -83,6 +93,10 @@ export default function HomeScreen({navigation}: any) {
       const bikesRes = await axios.get(`${API_URL}/user/my-bikes`, {
         headers: {Authorization: `Bearer ${token}`}
       });
+
+      //DEBUG
+      console.log("Bikes Response:", bikesRes.data);
+      console.log("Bikes Data", bikesRes.data.data);
 
       setMyBikes(bikesRes.data.data || []);
 
@@ -96,14 +110,35 @@ export default function HomeScreen({navigation}: any) {
 
 
     } catch (err:any) {
-
-      console.error('Load Error:', err.response?.data || err.message);
-      Alert.alert('Session expired', 'Logging out...');
-      await signOut();
+      console.error('Load error:', err.response?.data || err.message);
+      Alert.alert('Error', 'Failed to load your data. Pull to refresh or try again')
     } finally {
       setLoading(false);
     }
   };
+
+
+
+  useEffect(() => {
+    if (isAuthenticated) {        // ← only fires when auth is confirmed
+      loadUserAndBikes();
+    }
+  }, [isAuthenticated]);          // ← runs when this value changes
+
+
+  // re-fetch address when returning from AddressScreen
+  // error: this fired on every focus, including before the login is complete
+  useEffect( () => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      if (!isAuthenticated) return; //guard
+      const token = await SecureStore.getItemAsync('accessToken');
+      loadUserAndBikes();
+      //if (!token) return; // guard
+      //fetchAddresses(token); //pass token explicitly
+    });
+    return unsubscribe;
+  }, [navigation, isAuthenticated]);
+  
 
   if (loading) {
     return (
@@ -126,54 +161,79 @@ export default function HomeScreen({navigation}: any) {
 
 
 
+ return (
+    //Wrap in a plain View so AddressBar sits ABOVE the ScrollView
+    <SafeAreaView style= {{ flex:1, backgroundColor: '#fff'}} >
+    <View style={styles.wrapper}>
 
-   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Welcome, {user.name}!</Text>
-      <Text style={styles.subtitle}>Phone: {user.phone}</Text>
+      {/* Zomato-style address bar — always visible at top */}
+      <AddressBar
+        address={latestAddress}
+        loading={loadingAddresses}
+        onPress={() => navigation.navigate('Address')}
+      />
 
-      {!hasBikes ? (
-        // FIRST-TIME USER: Bike CTA
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>🏍️ Add Your First Bike</Text>
-          <Text style={styles.cardText}>Enter bike details to book services.</Text>
-          <TouchableOpacity style={styles.ctaButton} onPress={() => navigation.navigate('BikeAdd') }>
-            <Text style={styles.ctaText}>+ Add Bike</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        // RETURNING USER: Dashboard
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Your Bikes ({myBikes.length})</Text>
-          <Text style={styles.cardText}>Ready to book service?</Text>
-          <TouchableOpacity style={styles.ctaButton}>
-            <Text style={styles.ctaText}>Book Service</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={loadUserAndBikes}
+          colors={['#10b981']}
+          tintColor="#10b981"
+        />
+        }
+      >
+        <Text style={styles.title}>Welcome, {user.name}!</Text>
+        <Text style={styles.subtitle}>Phone: {user.phone}</Text>
+        
 
-      {__DEV__ && (
-        <View style={styles.devSection}>
-          <TouchableOpacity style={styles.devButton} onPress={devSignIn}>
-            <Text>🔧 Dev Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.devButton, styles.logoutButton]} onPress={signOut}>
-            <Text>🚪 Logout</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.devButton} onPress={loadUserAndBikes}>
-            <Text>🔄 Reload</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+        {myBikes.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>🏍️ Add Your First Bike</Text>
+            <Text style={styles.cardText}>Enter bike details to book services.</Text>
+            <TouchableOpacity
+              style={styles.ctaButton}
+              onPress={() => navigation.navigate('BikeAdd')}
+            >
+              <Text style={styles.ctaText}>+ Add Bike</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Your Bikes ({myBikes.length})</Text>
+            <Text style={styles.cardText}>Ready to book service?</Text>
+            <TouchableOpacity style={styles.ctaButton}>
+              <Text style={styles.ctaText}>Book Service</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {__DEV__ && (
+          <View style={styles.devSection}>
+            <TouchableOpacity style={styles.devButton} onPress={devSignIn}>
+              <Text>🔧 Dev Login</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.devButton, styles.logoutButton]} onPress={signOut}>
+              <Text>🚪 Logout</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.devButton} onPress={loadUserAndBikes}>
+              <Text>🔄 Reload</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#f8fafc' },
+  wrapper: { flex: 1, backgroundColor: '#f8fafc' }, // ✅ New outer wrapper
+  container: { flex: 1, padding: 24 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 16, fontSize: 16, color: '#64748b' },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#1e293b', marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#1e293b', marginBottom: 8, marginTop: 16 },
   subtitle: { fontSize: 18, color: '#64748b', marginBottom: 32 },
   card: {
     backgroundColor: 'white',
@@ -194,12 +254,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaText: { color: 'white', fontSize: 18, fontWeight: '600' },
-  devSection: {
-    marginTop: 32,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
+  devSection: { marginTop: 32, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
   devButton: {
     backgroundColor: '#f1f5f9',
     padding: 16,
