@@ -1,3 +1,5 @@
+//src/components/addressbar
+
 import React from 'react'; //imports react core from react
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'; //imports UI components from react native
 import { Address } from '../hooks/useAddress'; // imports address typescript interface

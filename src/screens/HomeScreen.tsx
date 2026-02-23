@@ -1,52 +1,15 @@
-/*
-// src/screens/HomeScreen.tsx
-import React from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-
-export default function HomeScreen() {
-  const { signOut } = useAuth();
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Motospot! 🏍️</Text>
-      <Text style={styles.subtitle}>You're logged in</Text>
-      
-      <Button title="Sign Out" onPress={signOut} color="#ef4444" />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#f8fafc',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748b',
-    marginBottom: 40,
-  },
-});
-
-
-
-
-*/
-
-
-
-
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Alert, 
+  ScrollView, 
+  ActivityIndicator, 
+  RefreshControl,
+  FlatList 
+} from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import {useAuth} from '../context/AuthContext';
@@ -54,24 +17,19 @@ import AddressBar from '../components/AddressBar';
 import { useAddress } from '../hooks/useAddress';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
 export default function HomeScreen({navigation}: any) {
   const [user, setUser] = useState<{name: string, phone: string} | null>(null);
   const [myBikes, setMyBikes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { signOut, devSignIn, isAuthenticated } = useAuth();  // Last
-
-  //address hook
+  const { signOut, devSignIn, isAuthenticated } = useAuth();
   const {latestAddress, loadingAddresses, fetchAddresses} = useAddress();
 
   const loadUserAndBikes = async () => { 
     try {
       const token = await SecureStore.getItemAsync('accessToken');
       if (!token) {
-        //token missing  = session invalid
-        //await signOut();
         setLoading(false)
         return;
       }
@@ -83,31 +41,28 @@ export default function HomeScreen({navigation}: any) {
         setUser(JSON.parse(storedUser));
 
         const bikesRes = await axios.get(`${API_URL}/user/my-bikes`, {
-          headers: { Authorization: `Bearer ${token}`},
+          headers: { Authorization: `Bearer ${token}` },
         });
-        setMyBikes(bikesRes.data.data || []);
+        console.log('MY-BIKES RAW (storedUser):', bikesRes.data);
+        setMyBikes(bikesRes.data || []);
         return;
       }
 
-      //fetchbikes endpoint
+      console.log('Token for my-bikes:', token ? 'present' : 'MISSING');
       const bikesRes = await axios.get(`${API_URL}/user/my-bikes`, {
         headers: {Authorization: `Bearer ${token}`}
       });
 
-      //DEBUG
-      console.log("Bikes Response:", bikesRes.data);
-      console.log("Bikes Data", bikesRes.data.data);
+      console.log('MY-BIKES RAW:', bikesRes.data);
+      setMyBikes(bikesRes.data || []);
 
-      setMyBikes(bikesRes.data.data || []);
-
-       // Refresh user if needed (your /dashboard/me/)
+      // Refresh user if needed
       const profileRes = await axios.get(`${API_URL}/dashboard/me/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const freshUser = profileRes.data;  // Update from server
+      const freshUser = profileRes.data;
       setUser(freshUser);
       await SecureStore.setItemAsync('user', JSON.stringify(freshUser));
-
 
     } catch (err:any) {
       console.error('Load error:', err.response?.data || err.message);
@@ -117,28 +72,20 @@ export default function HomeScreen({navigation}: any) {
     }
   };
 
-
-
   useEffect(() => {
-    if (isAuthenticated) {        // ← only fires when auth is confirmed
+    if (isAuthenticated) {
       loadUserAndBikes();
     }
-  }, [isAuthenticated]);          // ← runs when this value changes
+  }, [isAuthenticated]);
 
-
-  // re-fetch address when returning from AddressScreen
-  // error: this fired on every focus, including before the login is complete
   useEffect( () => {
     const unsubscribe = navigation.addListener('focus', async () => {
-      if (!isAuthenticated) return; //guard
+      if (!isAuthenticated) return;
       const token = await SecureStore.getItemAsync('accessToken');
       loadUserAndBikes();
-      //if (!token) return; // guard
-      //fetchAddresses(token); //pass token explicitly
     });
     return unsubscribe;
   }, [navigation, isAuthenticated]);
-  
 
   if (loading) {
     return (
@@ -150,91 +97,195 @@ export default function HomeScreen({navigation}: any) {
   }
 
   if (!user) {
-    return  (
-    <View style={styles.container}>
-      <Text>Loading…</Text>
-    </View>
-  );
+    return (
+      <View style={styles.container}>
+        <Text>Loading…</Text>
+      </View>
+    );
   }
 
   const hasBikes = myBikes.length > 0;
 
-
-
- return (
-    //Wrap in a plain View so AddressBar sits ABOVE the ScrollView
-    <SafeAreaView style= {{ flex:1, backgroundColor: '#fff'}} >
-    <View style={styles.wrapper}>
-
-      {/* Zomato-style address bar — always visible at top */}
-      <AddressBar
-        address={latestAddress}
-        loading={loadingAddresses}
-        onPress={() => navigation.navigate('Address')}
-      />
-
-      <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={loadUserAndBikes}
-          colors={['#10b981']}
-          tintColor="#10b981"
+  return (
+    <SafeAreaView style={{ flex:1, backgroundColor: '#fff' }}>
+      <View style={styles.wrapper}>
+        <AddressBar
+          address={latestAddress}
+          loading={loadingAddresses}
+          onPress={() => {
+          navigation.navigate('AddressList');
+        }}
         />
-        }
-      >
-        <Text style={styles.title}>Welcome, {user.name}!</Text>
-        <Text style={styles.subtitle}>Phone: {user.phone}</Text>
-        
 
-        {myBikes.length === 0 ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🏍️ Add Your First Bike</Text>
-            <Text style={styles.cardText}>Enter bike details to book services.</Text>
-            <TouchableOpacity
-              style={styles.ctaButton}
-              onPress={() => navigation.navigate('BikeAdd')}
-            >
-              <Text style={styles.ctaText}>+ Add Bike</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Your Bikes ({myBikes.length})</Text>
-            <Text style={styles.cardText}>Ready to book service?</Text>
-            <TouchableOpacity style={styles.ctaButton}>
-              <Text style={styles.ctaText}>Book Service</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <ScrollView 
+          style={styles.container}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={loadUserAndBikes}
+              colors={['#10b981']}
+              tintColor="#10b981"
+            />
+          }
+        >
+          <Text style={styles.title}>Welcome, {user.name}!</Text>
+          <Text style={styles.subtitle}>Phone: {user.phone}</Text>
 
-        {__DEV__ && (
-          <View style={styles.devSection}>
-            <TouchableOpacity style={styles.devButton} onPress={devSignIn}>
-              <Text>🔧 Dev Login</Text>
+          {/* BIKES SECTION */}
+          {myBikes.length === 0 ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>🏍️ Add Your First Bike</Text>
+              <Text style={styles.cardText}>Enter bike details to book services.</Text>
+              <TouchableOpacity
+                style={styles.ctaButton}
+                onPress={() => navigation.navigate('BikeAdd')}
+              >
+                <Text style={styles.ctaText}>+ Add Bike</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.bikesSection}>
+                <Text style={styles.sectionTitle}>Your Bikes ({myBikes.length})</Text>
+                <FlatList
+                  data={myBikes}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <View style={styles.bikeCard}>
+                    <View style={{flex : 1}}>
+                      <Text style={styles.bikeCompany}>{item.company_name}</Text>
+                      <Text style={styles.bikeModel}>{item.model_name}</Text>
+                    </View>
+                    <View style={{alignItems: 'flex-end'}}>
+                      <Text style={styles.bikeReg}>{item.registration_number}</Text>
+                      <Text style={styles.bikeYear}>{item.purchase_year}</Text>
+                    </View>
+                    </View>
+                  )}
+                  style={styles.bikesList}
+                  showsVerticalScrollIndicator={false}
+                  scrollEnabled={false} // ← prevents ScrollView conflict
+                />
+                <TouchableOpacity 
+                  style={styles.addBikeBtn}
+                  onPress={() => navigation.navigate('BikeAdd')}
+                >
+                  <Text style={styles.addBikeText}>+ Add Another Bike</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Book Service CTA */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Ready to book service?</Text>
+                <TouchableOpacity style={styles.ctaButton}>
+                  <Text style={styles.ctaText}>Book Service</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {__DEV__ && (
+            <View style={styles.devSection}>
+              <TouchableOpacity style={styles.devButton} onPress={devSignIn}>
+                <Text>🔧 Dev Login</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.devButton, styles.logoutButton]} onPress={signOut}>
+                <Text>🚪 Logout</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.devButton} onPress={loadUserAndBikes}>
+                <Text>🔄 Reload</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.devButton} onPress={async () => {
+              const token = await SecureStore.getItemAsync('accessToken');
+              const res = await axios.get(`${API_URL}/address/my-addresses`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              console.log('ADDRESSES:', res.data);
+            }}>
+              <Text>🗺️ Test Addresses</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.devButton, styles.logoutButton]} onPress={signOut}>
-              <Text>🚪 Logout</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.devButton} onPress={loadUserAndBikes}>
-              <Text>🔄 Reload</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-    </View>
+            </View>
+          )}
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: { flex: 1, backgroundColor: '#f8fafc' }, // ✅ New outer wrapper
+  wrapper: { flex: 1, backgroundColor: '#f8fafc' },
   container: { flex: 1, padding: 24 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 16, fontSize: 16, color: '#64748b' },
   title: { fontSize: 28, fontWeight: 'bold', color: '#1e293b', marginBottom: 8, marginTop: 16 },
   subtitle: { fontSize: 18, color: '#64748b', marginBottom: 32 },
+  
+  // NEW BIKE STYLES
+  bikesSection: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 10,
+  },
+  bikesList: {
+    maxHeight: 220,
+  },
+  bikeCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#10b981",
+  },
+  bikeCompany: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  bikeModel: {
+    fontSize: 14,
+    color: '#475569',
+    //marginTop: 0,
+  },
+  bikeReg: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#10b981',
+    //marginTop: 0,
+  },
+  bikeYear: {
+    fontSize: 14,
+    color: '#64748b',
+    //marginTop: 0,
+  },
+  addBikeBtn: {
+    backgroundColor: '#10b981',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  addBikeText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // EXISTING STYLES
   card: {
     backgroundColor: 'white',
     padding: 24,
