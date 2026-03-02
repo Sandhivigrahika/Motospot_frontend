@@ -9,9 +9,11 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@react-navigation/native": "6.1.10",
+    "@react-native-community/datetimepicker": "^8.6.0",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native": "^6.1.10",
     "@react-navigation/native-stack": "6.11.0",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "expo": "~54.0.33",
     "expo-auth-session": "~7.0.10",
     "expo-crypto": "~15.0.8",
