@@ -40,7 +40,7 @@ const BookingsListScreen = () => {
 
  const loadBookings = async () => {
     try {
-      const token = await SecureStore.getItemAsync('token');
+      const token = await SecureStore.getItemAsync('accessToken');
       const response = await axios.get(`${API_URL}/bookings/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -62,7 +62,7 @@ const BookingsListScreen = () => {
           text: 'Yes',
           onPress: async () => {
             try {
-              const token = await SecureStore.getItemAsync('token');
+              const token = await SecureStore.getItemAsync('accessToken');
               await axios.post(
                 `${API_URL}/bookings/${bookingId}/cancel`,
                 {},

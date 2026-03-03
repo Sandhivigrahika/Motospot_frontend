@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal
 } from 'react-native';
+import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as SecureStore from 'expo-secure-store';
 import axios, {AxiosError} from 'axios';
@@ -64,7 +65,7 @@ const BookingScreen = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [preferredTime, setPreferredTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [currentCondition, setCurrentCondition] = useState<'running_condition' | 'dead_condition'>('running_condition'); // From schema
+  const [currentCondition, setCurrentCondition] = useState<'running condition' | 'dead condition'>('running condition'); // From schema
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showBikeModal, setShowBikeModal] =useState(false);
@@ -132,9 +133,12 @@ const BookingScreen = () => {
         notes: notes || undefined,
       };
 
-      await axios.post(`${API_URL}/bookings/`, payload, {
+      console.log('paylod:', JSON.stringify(payload))
+
+      const response = await axios.post(`${API_URL}/bookings/`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      console.log('3️Response:', response.status, response.data);
 
       Alert.alert('Success', 'Booking created!', [
         { text: 'OK', onPress: () => navigation.navigate('Bookings')
@@ -142,8 +146,11 @@ const BookingScreen = () => {
       ]);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        Alert.alert('Error', error.response?.data?.detail || 'Booking Failed')
+        console.log('❌ Status:', error.response?.status);
+        console.log('❌ Data:', JSON.stringify(error.response?.data));
+        Alert.alert('Error', String(error.response?.data?.detail || 'Booking Failed'));
       } else if (error instanceof Error) {
+        console.log('❌ Non-axios error:', error.message, error.stack);
         Alert.alert('Error', error.message);
       } else {
         Alert.alert('Error', 'Booking Failed');
@@ -154,6 +161,7 @@ const BookingScreen = () => {
   };
 
     return (
+    <SafeAreaView style={{flex:1}} edges={['top','left', 'right']}>
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       <Text style={styles.title}>Book Service</Text>
 
@@ -272,13 +280,13 @@ const BookingScreen = () => {
       {/* Bike Condition */}
       <Text style={styles.label}>Bike Condition</Text>
       <View style={styles.toggleContainer}>
-        <TouchableOpacity style={[styles.toggleBtn, currentCondition === 'running_condition' && styles.toggleBtnActive]}
-          onPress={() => setCurrentCondition('running_condition')}>
-          <Text style={[styles.toggleBtnText, currentCondition === 'running_condition' && styles.toggleBtnTextActive]}>🟢 Running</Text>
+        <TouchableOpacity style={[styles.toggleBtn, currentCondition === 'running condition' && styles.toggleBtnActive]}
+          onPress={() => setCurrentCondition('running condition')}>
+          <Text style={[styles.toggleBtnText, currentCondition === 'running condition' && styles.toggleBtnTextActive]}>🟢 Running</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.toggleBtn, currentCondition === 'dead_condition' && styles.toggleBtnActive]}
-          onPress={() => setCurrentCondition('dead_condition')}>
-          <Text style={[styles.toggleBtnText, currentCondition === 'dead_condition' && styles.toggleBtnTextActive]}>🔴 Dead</Text>
+        <TouchableOpacity style={[styles.toggleBtn, currentCondition === 'dead condition' && styles.toggleBtnActive]}
+          onPress={() => setCurrentCondition('dead condition')}>
+          <Text style={[styles.toggleBtnText, currentCondition === 'dead condition' && styles.toggleBtnTextActive]}>🔴 Dead</Text>
         </TouchableOpacity>
       </View>
 
@@ -291,6 +299,7 @@ const BookingScreen = () => {
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.bookButtonText}>Book Service</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </SafeAreaView>
   );
 };
 

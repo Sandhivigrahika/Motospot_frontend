@@ -175,12 +175,7 @@ export default function HomeScreen({navigation}: any) {
               </View>
 
               {/* Book Service CTA */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Ready to book service?</Text>
-                <TouchableOpacity style={styles.ctaButton}>
-                  <Text style={styles.ctaText}>Book Service</Text>
-                </TouchableOpacity>
-              </View>
+              
             </>
           )}
 
