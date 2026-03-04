@@ -18,7 +18,6 @@ import * as SecureStore from 'expo-secure-store';
 import axios, {AxiosError} from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext'; // Assuming you have this
-import BookingsListScreen from './BookingListScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 type RootTabParamList = {
@@ -223,10 +222,10 @@ const BookingScreen = () => {
           onChange={(_, date) => { setShowDatePicker(false); if (date) setPreferredDate(date); }} />
       )}
       {showTimePicker && (
-        <DateTimePicker value={preferredTime} mode="time" is24Hour display="default"
+        <DateTimePicker value={preferredTime} mode="time" minuteInterval={30} is24Hour display="default"
           onChange={(_, date) => {
             setShowTimePicker(false);
-            if (date) { date.setMinutes(0, 0, 0); setPreferredTime(date); }
+            if (date) {setPreferredTime(date); }
           }} />
       )}
 

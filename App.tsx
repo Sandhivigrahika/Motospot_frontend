@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import LoginScreen from './src/screens/LoginScreen';
 import OTPScreen from './src/screens/OTPScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -33,10 +34,29 @@ function Navigation() {
     <NavigationContainer>
       {isAuthenticated ? (
         <Tab.Navigator 
-          screenOptions={{ 
+          screenOptions={({ route }) => ({  // ← Added route here
             headerShown: false,
-            tabBarStyle: { paddingBottom: 8, height: 60 }
-          }}
+            tabBarStyle: { paddingBottom: 8, height: 60 },
+            tabBarActiveTintColor: '#1BAC4B',  // ← Added colors
+            tabBarInactiveTintColor: '#9BA0AA',
+            tabBarIcon: ({ focused, color, size }) => {
+              let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'home';
+
+              switch (route.name) {  // ← Now route works
+                case 'Home':
+                  iconName = focused ? 'home' : 'home-outline';
+                  break;
+                case 'Book':
+                  iconName = focused ? 'add-circle' : 'add-circle-outline';
+                  break;
+                case 'Bookings':
+                  iconName = focused ? 'receipt' : 'receipt-outline';
+                  break;
+              }
+
+              return <Ionicons name={iconName} size={size} color={color} />;
+            },
+          })}
         >
           {/* Main tabs */}
           <Tab.Screen 
