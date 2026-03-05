@@ -109,14 +109,27 @@ export default function HomeScreen({navigation}: any) {
   return (
     <SafeAreaView style={{ flex:1, backgroundColor: '#fff' }}>
       <View style={styles.wrapper}>
-        <AddressBar
-          address={latestAddress}
-          loading={loadingAddresses}
-          onPress={() => {
-          navigation.navigate('AddressList');
-        }}
-        />
-
+      <View style={styles.headerRow}>
+        {/* AddressBar - LEFT (70% width) */}
+        <View style={styles.addressContainer}>
+          <AddressBar
+            address={latestAddress}
+            loading={loadingAddresses}
+            onPress={() => navigation.navigate('AddressList')}
+          />
+        </View>
+        
+        {/* Profile Button - RIGHT (fixed 60px) */}
+        <TouchableOpacity 
+          style={styles.profileButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <Text style={styles.profileIcon}>👤</Text>
+        </TouchableOpacity>
+      </View>
+          
+          
+        
         <ScrollView 
           style={styles.container}
           refreshControl={
@@ -309,4 +322,30 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   logoutButton: { backgroundColor: '#fee2e2' },
+
+  headerRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  backgroundColor: 'white',
+  borderBottomWidth: 1,
+  borderBottomColor: '#f3f4f6',
+},
+addressContainer: {
+  flex: 1,           // Takes all remaining space (LEFT)
+  marginRight: 12,   // Perfect spacing
+},
+profileButton: {
+  width: 48,         // Fixed right size
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: '#f3f4f6',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+profileIcon: {
+  fontSize: 24,
+  fontWeight: 'bold',
+},
 });
