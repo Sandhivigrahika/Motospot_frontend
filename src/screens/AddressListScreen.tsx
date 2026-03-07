@@ -100,7 +100,7 @@ export default function AddressListScreen({navigation}: any) {
         />
          <TouchableOpacity 
         style={styles.addButton}
-        onPress={() => navigation.navigate('AddressScreen')}
+        onPress={() => navigation.navigate('AddressForm')}
       >
         <Text style={styles.addButtonText}>+ Add New Address</Text>
       </TouchableOpacity>

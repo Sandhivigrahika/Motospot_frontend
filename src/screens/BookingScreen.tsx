@@ -19,14 +19,15 @@ import axios, {AxiosError} from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext'; // Assuming you have this
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import BookingsListScreen from './BookingListScreen';
 
 type RootTabParamList = {
   Home: undefined;
   Book: undefined;
   Bookings: undefined;
-  BikeAdd: undefined;
+  BikeForm: undefined;
   AddressList: undefined;
-  AddressScreen: undefined;
+  AddressForm: undefined;
 };
 
 interface Bike {
@@ -136,13 +137,17 @@ const BookingScreen = () => {
 
       const response = await axios.post(`${API_URL}/bookings/`, payload, {
         headers: { Authorization: `Bearer ${token}` },
+  
       });
-      console.log('3️Response:', response.status, response.data);
 
-      Alert.alert('Success', 'Booking created!', [
-        { text: 'OK', onPress: () => navigation.navigate('Bookings')
-         }, // Or your bookings tab - bookings page needs to be created
-      ]);
+      if (response.status === 201 || response.status===200) {
+        Alert.alert('Success', 'Booking Created');
+        navigation.navigate('Bookings');
+      } else {
+      console.log('Non critical error:', response.status, response.data);
+      Alert.alert('Success', 'Booking created!');
+         } // Or your bookings tab - bookings page needs to be created
+      
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         console.log('❌ Status:', error.response?.status);

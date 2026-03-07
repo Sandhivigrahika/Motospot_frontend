@@ -1,24 +1,103 @@
 import React from 'react';
-import { NavigationContainer} from '@react-navigation/native';
-import { TouchableOpacity, Text } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+
+// ── Screen imports ────────────────────────────────────────────────────────────
 import LoginScreen from './src/screens/LoginScreen';
 import OTPScreen from './src/screens/OTPScreen';
 import HomeScreen from './src/screens/HomeScreen';
-import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { ActivityIndicator, View } from 'react-native';
-import BikeAddScreen from './src/screens/BikeAddScreen';
-import AddressScreen from './src/screens/AddressScreen';
-import AddressListScreen from './src/screens/AddressListScreen';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BookingScreen from './src/screens/BookingScreen';
 import BookingsListScreen from './src/screens/BookingListScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import BikeFormScreen from './src/screens/BikeFormScreen';
+import AddressFormScreen from './src/screens/AddressFormScreen';
+import AddressListScreen from './src/screens/AddressListScreen';
+
+// Log to catch undefined imports immediately
+if (!HomeScreen) console.error('HomeScreen is undefined — check export/path');
+if (!BikeFormScreen) console.error('BikeFormScreen is undefined — check export/path');
+if (!AddressFormScreen) console.error('AddressFormScreen is undefined — check export/path');
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 1000 * 60 * 5, gcTime: 1000 * 60 * 30, retry: 2 },
+  },
+});
+
+function TabNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: { paddingBottom: 8, height: 60 },
+        tabBarActiveTintColor: '#1BAC4B',
+        tabBarInactiveTintColor: '#9BA0AA',
+        tabBarIcon: ({ focused, color, size }) => {
+          const icons: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+            Home: focused ? 'home' : 'home-outline',
+            Book: focused ? 'add-circle' : 'add-circle-outline',
+            Bookings: focused ? 'receipt' : 'receipt-outline',
+          };
+          return <Ionicons name={icons[route.name] ?? 'home'} size={size} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Book" component={BookingScreen} options={{ title: 'Book Now' }} />
+      <Tab.Screen name="Bookings" component={BookingsListScreen} options={{ title: 'Status' }} />
+    </Tab.Navigator>
+  );
+}
+
+function AppStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Tabs" component={TabNavigator} />
+
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+
+      {/* ✅ BikeForm handles both Add and Edit */}
+      <Stack.Screen
+        name="BikeForm"
+        component={BikeFormScreen}
+        options={({ route }: any) => ({
+          headerShown: true,
+          title: route.params?.bike ? 'Edit Bike' : 'Add Bike',
+          headerBackTitle: 'Back',
+          headerTintColor: '#111827',
+        })}
+      />
+
+      {/* ✅ AddressForm handles both Add and Edit */}
+      <Stack.Screen
+        name="AddressForm"
+        component={AddressFormScreen}
+        options={({ route }: any) => ({
+          headerShown: true,
+          title: route.params?.address ? 'Edit Address' : 'Add Address',
+          headerBackTitle: 'Back',
+          headerTintColor: '#111827',
+        })}
+      />
+
+      <Stack.Screen
+        name="AddressList"
+        component={AddressListScreen}
+        options={{ headerShown: true, title: 'My Addresses', headerBackTitle: 'Back' }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 function Navigation() {
   const { isAuthenticated, loading } = useAuth();
@@ -34,72 +113,7 @@ function Navigation() {
   return (
     <NavigationContainer>
       {isAuthenticated ? (
-        <Tab.Navigator 
-          screenOptions={({ route }) => ({  // ← Added route here
-            headerShown: false,
-            tabBarStyle: { paddingBottom: 8, height: 60 },
-            tabBarActiveTintColor: '#1BAC4B',  // ← Added colors
-            tabBarInactiveTintColor: '#9BA0AA',
-            tabBarIcon: ({ focused, color, size }) => {
-              let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'home';
-
-              switch (route.name) {  // ← Now route works
-                case 'Home':
-                  iconName = focused ? 'home' : 'home-outline';
-                  break;
-                case 'Book':
-                  iconName = focused ? 'add-circle' : 'add-circle-outline';
-                  break;
-                case 'Bookings':
-                  iconName = focused ? 'receipt' : 'receipt-outline';
-                  break;
-              }
-
-              return <Ionicons name={iconName} size={size} color={color} />;
-            },
-          })}
-        >
-          {/* Main tabs */}
-          <Tab.Screen 
-            name="Home" 
-            component={HomeScreen} 
-            options={{ 
-              headerShown: false  // No header interference
-            }}
-          />
-          <Tab.Screen 
-            name="Book" 
-            component={BookingScreen} 
-            options={{ title: 'Book Now' }}
-          />
-          <Tab.Screen 
-            name="Bookings" 
-            component={BookingsListScreen} 
-            options={{ title: 'Status' }}
-          />
-          
-          {/* Modals - hidden from tab bar */}
-          <Tab.Screen 
-            name="BikeAdd" 
-            component={BikeAddScreen} 
-            options={{ tabBarButton: () => null }}
-          />
-          <Tab.Screen 
-            name="AddressList" 
-            component={AddressListScreen} 
-            options={{ tabBarButton: () => null }}
-          />
-          <Tab.Screen 
-            name="AddressScreen" 
-            component={AddressScreen} 
-            options={{ tabBarButton: () => null }}
-          />
-          <Tab.Screen 
-            name="Profile" 
-            component={ProfileScreen} 
-            options={{ tabBarButton: () => null }}
-          />
-        </Tab.Navigator>
+        <AppStack />
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -113,9 +127,11 @@ function Navigation() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <Navigation />
-      </AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Navigation />
+        </AuthProvider>
+      </QueryClientProvider>
     </SafeAreaProvider>
   );
 }

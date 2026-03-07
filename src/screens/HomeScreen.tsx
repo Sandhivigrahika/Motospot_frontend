@@ -151,7 +151,7 @@ export default function HomeScreen({navigation}: any) {
               <Text style={styles.cardText}>Enter bike details to book services.</Text>
               <TouchableOpacity
                 style={styles.ctaButton}
-                onPress={() => navigation.navigate('BikeAdd')}
+                onPress={() => navigation.navigate('BikeForm')}
               >
                 <Text style={styles.ctaText}>+ Add Bike</Text>
               </TouchableOpacity>
@@ -181,7 +181,7 @@ export default function HomeScreen({navigation}: any) {
                 />
                 <TouchableOpacity 
                   style={styles.addBikeBtn}
-                  onPress={() => navigation.navigate('BikeAdd')}
+                  onPress={() => navigation.navigate('BikeForm')}
                 >
                   <Text style={styles.addBikeText}>+ Add Another Bike</Text>
                 </TouchableOpacity>
