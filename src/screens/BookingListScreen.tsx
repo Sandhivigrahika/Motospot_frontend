@@ -60,7 +60,7 @@ const BookingsListScreen = () => {
       const response = await axios.get(`${API_URL}/bookings/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setBookings(response.data); // bike: {model_name, registration_no} already included
+      setBookings(response.data.slice().reverse()); // bike: {model_name, registration_no} already included
     } catch (error) {
       console.log('Bookings load error:', error);
       Alert.alert('Error', 'Failed to load bookings');
