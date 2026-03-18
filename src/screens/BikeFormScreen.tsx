@@ -9,6 +9,10 @@ import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const BIKES_KEY = 'motospot_my_bikes_cache'; // Unique key
+
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 const FUEL_TYPES = ['petrol',  'electric'];
@@ -16,14 +20,22 @@ const FUEL_TYPES = ['petrol',  'electric'];
 interface Company { id: string; company_name: string; }
 interface Model { id: string; model_name: string; company_id: string; }
 
+interface Bike {id: string | number;
+  registration_number: string;
+  company_name: string;
+  model_name: string;
+  purchase_year?: number;
+  // Add other fields from your API
+}
+
 export default function BikeFormScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const queryClient = useQueryClient();
 
   // ── Detect mode ──────────────────────────────────────────────────────────
-  const existingBike = route.params?.bike;
-  const isEditing = !!existingBike;
+  const existingBike = route.params?.bike; // Get bike data from the previous screen
+  const isEditing = !!existingBike; // true = edit mode, false = add new
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
@@ -114,6 +126,8 @@ const handleSubmit = async () => {
     const token = await SecureStore.getItemAsync('accessToken');
     const headers = { Authorization: `Bearer ${token}` };
 
+    let res;
+
     if (isEditing) {
       // ── UPDATE: BikeUpdate schema (names, nullable) ──────────────────────
       const selectedCompany = companies.find((c) => String(c.id) === companyValue);
@@ -130,10 +144,10 @@ const handleSubmit = async () => {
       console.log('🔵 UPDATE URL:', `${API_URL}/bikes/${existingBike.id}`);
       console.log('🔵 UPDATE PAYLOAD:', JSON.stringify(payload, null, 2));
 
-      const res = await axios.put(`${API_URL}/bikes/${existingBike.id}`, payload, { headers });
-      
+      res = await axios.put(`${API_URL}/bikes/${existingBike.id}`, payload, { headers });
       console.log('✅ UPDATE SUCCESS:', res.status, res.data);
       Alert.alert('Success', 'Bike updated! ✅');
+
     } else {
       // ── CREATE: BikeCreate schema (IDs, required) ───────────────────────
       const payload = {
@@ -147,12 +161,18 @@ const handleSubmit = async () => {
       console.log('🟢 CREATE URL:', `${API_URL}/bikes/add`);
       console.log('🟢 CREATE PAYLOAD:', JSON.stringify(payload, null, 2));
 
-      const res = await axios.post(`${API_URL}/bikes/add`, payload, { headers });
+      res = await axios.post(`${API_URL}/bikes/add`, payload, { headers });
+
+      const newBike = res.data.details || res.data;
       
       console.log('✅ CREATE SUCCESS:', res.status, res.data);
       Alert.alert('Success', 'Bike added! 🎉');
+
     }
 
+    await updateBikeCache(res.data.details || res.data);
+
+    
     // ── Common success handling ────────────────────────────────────────────
     await queryClient.invalidateQueries({ queryKey: ['myBikes'] });
     navigation.goBack();
@@ -170,6 +190,29 @@ const handleSubmit = async () => {
   } finally {
     setLoading(false);
   }
+};
+
+// one function to handle caching
+const updateBikeCache = async (newBike: Bike) => {
+  try {
+    const existingStr = await AsyncStorage.getItem(BIKES_KEY)
+    const bikes = existingStr ?  JSON.parse(existingStr): [];
+
+    if (isEditing) {
+      //replace old bike
+      const index = bikes.findIndex((b: Bike) => b.id === existingBike.id);
+      if (index !== -1) bikes[index] = newBike;
+    } else {
+      //Add new bike
+      bikes.push(newBike);
+  }
+
+  await AsyncStorage.setItem(BIKES_KEY, JSON.stringify(bikes));
+  await queryClient.invalidateQueries({queryKey: ['myBikes']});
+
+} catch (e) {
+  console.log('cache failed', e);
+}
 };
 
 
@@ -196,7 +239,7 @@ const handleSubmit = async () => {
             message: err.message,
           });
             Alert.alert('Cannot Delete Bike', 'This bike has existing service bookings.'),
-            [{text: 'OK'}];
+            [{text: 'OK'}]; //TO handle this allow bikes to be deleted on the booking is set to be completed or cancelled, or remove the cascading all together.
           } finally {
             setDeleteLoading(false);
           }

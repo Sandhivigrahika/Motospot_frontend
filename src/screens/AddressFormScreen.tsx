@@ -9,6 +9,10 @@ import * as SecureStore from 'expo-secure-store';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+const ADDRESS_KEY ='motospot_my_addresses_cache';
+
+
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 const LABELS = ['Home', 'Work', 'Other'];
 
@@ -47,12 +51,35 @@ export default function AddressFormScreen() {
       const token = await SecureStore.getItemAsync('accessToken');
       const headers = { Authorization: `Bearer ${token}` };
 
+      let res; //declaring the rest variable
+
       if (isEditing) {
-        await axios.put(`${API_URL}/address/${existingAddress.id}`, form, { headers });
+        res = await axios.put(`${API_URL}/address/${existingAddress.id}`, form, { headers });
         Alert.alert('Success', 'Address updated! ✅');
       } else {
-        await axios.post(`${API_URL}/address/add`, form, { headers });
+        res = await axios.post(`${API_URL}/address/add`, form, { headers });
         Alert.alert('Success', 'Address saved! 📍');
+      }
+
+      const newAddress = res.data;
+
+      //cache update (works for both add + edit)
+      try {
+        const existing = await AsyncStorage.getItem(ADDRESS_KEY);
+        const addresses = existing ? JSON.parse(existing): [];
+
+        if (isEditing) {
+          //update exisitng
+          const index = addresses.findIndex((a:any) => a.id === existingAddress.id);
+          if (index !==-1) addresses[index] = newAddress;
+        } else {
+          //addnew
+          addresses.push(newAddress)
+        }
+      await AsyncStorage.setItem(ADDRESS_KEY, JSON.stringify(addresses));
+
+      } catch (e) {
+        console.log('Address cache  failed:', e);
       }
 
       await queryClient.invalidateQueries({ queryKey: ['myAddresses'] });
@@ -67,27 +94,38 @@ export default function AddressFormScreen() {
 
   // ── Delete ─────────────────────────────────────────────────────────────────
   const handleDelete = () => {
-    Alert.alert('Remove Address', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive', onPress: async () => {
-          setDeleteLoading(true);
+  Alert.alert('Remove Address', 'Are you sure?', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Remove', style: 'destructive', onPress: async () => {
+        setDeleteLoading(true);
+        try {
+          const token = await SecureStore.getItemAsync('accessToken');
+          await axios.delete(`${API_URL}/address/${existingAddress.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          // ✅ ADD THIS — remove from cache
           try {
-            const token = await SecureStore.getItemAsync('accessToken');
-            await axios.delete(`${API_URL}/address/${existingAddress.id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            await queryClient.invalidateQueries({ queryKey: ['myAddresses'] });
-            navigation.goBack();
-          } catch {
-            Alert.alert('Error', 'Failed to remove address.');
-          } finally {
-            setDeleteLoading(false);
+            const existing = await AsyncStorage.getItem(ADDRESS_KEY);
+            const addresses = existing ? JSON.parse(existing) : [];
+            const filtered = addresses.filter((a: any) => a.id !== existingAddress.id);
+            await AsyncStorage.setItem(ADDRESS_KEY, JSON.stringify(filtered));
+          } catch (e) {
+            console.log('Address cache delete failed:', e);
           }
-        },
+
+          await queryClient.invalidateQueries({ queryKey: ['myAddresses'] });
+          navigation.goBack();
+        } catch {
+          Alert.alert('Error', 'Failed to remove address.');
+        } finally {
+          setDeleteLoading(false);
+        }
       },
-    ]);
-  };
+    },
+  ]);
+};
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   return (

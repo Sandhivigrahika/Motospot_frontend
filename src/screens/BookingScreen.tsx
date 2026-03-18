@@ -19,7 +19,8 @@ import axios, {AxiosError} from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext'; // Assuming you have this
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import BookingsListScreen from './BookingListScreen';
+//import BookingsListScreen from './BookingListScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootTabParamList = {
   Home: undefined;
@@ -44,8 +45,16 @@ interface Bike {
   }
 
   
-
+const BIKES_KEY = 'motospot_my_bikes_cache';
+const ADDRESS_KEY = 'motospot_my_address_cache';
 const API_URL = 'https://motospotbackend-production.up.railway.app';
+
+const TIME_SLOTS: string[] = [];
+for (let h = 7; h <= 21; h++) {
+  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`);
+  if (h < 21) TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`);
+}
+
 
 
 
@@ -63,8 +72,7 @@ const BookingScreen = () => {
   const [pincode, setPincode] = useState('');
   const [preferredDate, setPreferredDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [preferredTime, setPreferredTime] = useState(new Date());
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedTime, setSelectedTime] = useState('7:00');
   const [currentCondition, setCurrentCondition] = useState<'running condition' | 'dead condition'>('running condition'); // From schema
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,29 +89,47 @@ const BookingScreen = () => {
   }, []);
 
   const loadData = async () => {
-    try {
-      const token = await SecureStore.getItemAsync('accessToken');
-       console.log(' Token:', token ? 'Found ' : 'Missing ');
-      const [bikeRes, addrRes] = await Promise.all([
-        axios.get<Bike[]>(`${API_URL}/user/my-bikes`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get<Address[]>(`${API_URL}/address/my-addresses`, { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
+  try {
+    // ── Try cache first ──────────────────────────────────────
+    const [cachedBikes, cachedAddresses] = await Promise.all([
+      AsyncStorage.getItem(BIKES_KEY),
+      AsyncStorage.getItem(ADDRESS_KEY),
+    ]);
 
-      console.log('Bikes loaded:', bikeRes.data.length);
-      console.log('Address loadedL', addrRes.data.length);
+    if (cachedBikes)   setBikes(JSON.parse(cachedBikes));
+    if (cachedAddresses) setAddresses(JSON.parse(cachedAddresses));
 
-      setBikes(bikeRes.data);
-      setAddresses(addrRes.data);
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-      Alert.alert('Error',error.response?.data?.detail || 'Failed to load bikes/addresses');
+    // ── Then fetch fresh from API ────────────────────────────
+    const token = await SecureStore.getItemAsync('accessToken');
+    const [bikeRes, addrRes] = await Promise.all([
+      axios.get<Bike[]>(`${API_URL}/user/my-bikes`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get<Address[]>(`${API_URL}/address/my-addresses`, { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+
+    setBikes(bikeRes.data);
+    setAddresses(addrRes.data);
+
+    // ── Update cache with fresh data ─────────────────────────
+    await Promise.all([
+      AsyncStorage.setItem(BIKES_KEY, JSON.stringify(bikeRes.data)),
+      AsyncStorage.setItem(ADDRESS_KEY, JSON.stringify(addrRes.data)),
+    ]);
+
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to load bikes/addresses');
     }
   }
-  };
+};
+
+/*App opens
+  → Cache se instantly bikes/addresses   (fast ⚡)
+  → Background mein API call
+  → Fresh data aaye toh UI update + cache refresh */
 
   const formatTime = (date: Date) => {
     const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = '00'; // Always hour slots
+    const minutes = date.getMinutes().toString().padStart(2, '0'); //  hour and minute slots
     return `${hours}:${minutes}`;
   };
 
@@ -127,7 +153,7 @@ const BookingScreen = () => {
         bike_id: selectedBike,
         pincode,
         preferred_date: formatDate(preferredDate),
-        preferred_time: formatTime(preferredTime),
+        preferred_time: selectedTime,
         ...(useManualAddress ? { manual_address: manualAddress } : { address_id: selectedAddressId || null }),
         current_condition: currentCondition,
         notes: notes || undefined,
@@ -209,31 +235,39 @@ const BookingScreen = () => {
         placeholder="e.g. 560001"
         keyboardType="numeric"
       />
+    {/* Date & Time */}
+    <Text style={styles.label}>Date & Time</Text>
+    <View style={styles.row}>
+      <TouchableOpacity
+        style={[styles.dropdown, { flex: 1, marginRight: 8 }]}
+        onPress={() => setShowDatePicker(true)}
+      >
+        <Text style={styles.dropdownText}>{formatDate(preferredDate)}</Text>
+      </TouchableOpacity>
+    </View>
 
-      {/* Date & Time - Side by side */}
-      <Text style={styles.label}>Date & Time</Text>
-      <View style={styles.row}>
-        <TouchableOpacity style={[styles.dropdown, { flex: 1, marginRight: 8 }]} onPress={() => setShowDatePicker(true)}>
-          <Text style={styles.dropdownText}>{formatDate(preferredDate)}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.dropdown, { flex: 1 }]} onPress={() => setShowTimePicker(true)}>
-          <Text style={styles.dropdownText}>{formatTime(preferredTime)}</Text>
-        </TouchableOpacity>
+    {showDatePicker && (
+      <DateTimePicker value={preferredDate} mode="date" display="default"
+        minimumDate={new Date()}
+        onChange={(_, date) => { setShowDatePicker(false); if (date) setPreferredDate(date); }} />
+    )}
+
+    <Text style={styles.label}>Select Time</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+      <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
+        {TIME_SLOTS.map((slot) => (
+          <TouchableOpacity
+            key={slot}
+            onPress={() => setSelectedTime(slot)}
+            style={[styles.timeSlot, selectedTime === slot && styles.timeSlotActive]}
+          >
+            <Text style={[styles.timeSlotText, selectedTime === slot && styles.timeSlotTextActive]}>
+              {slot}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
-
-      {showDatePicker && (
-        <DateTimePicker value={preferredDate} mode="date" display="default"
-          minimumDate={new Date()}
-          onChange={(_, date) => { setShowDatePicker(false); if (date) setPreferredDate(date); }} />
-      )}
-      {showTimePicker && (
-        <DateTimePicker value={preferredTime} mode="time" minuteInterval={30} is24Hour display="default"
-          onChange={(_, date) => {
-            setShowTimePicker(false);
-            if (date) {setPreferredTime(date); }
-          }} />
-      )}
-
+    </ScrollView>
       {/* Address */}
       <Text style={styles.label}>Address</Text>
       <View style={styles.toggleContainer}>
@@ -334,6 +368,12 @@ const styles = StyleSheet.create({
   modalClose: { marginTop: 12, padding: 14, backgroundColor: '#f1f5f9', borderRadius: 10, alignItems: 'center' },
   modalCloseText: { fontSize: 15, fontWeight: '600', color: '#64748b' },
   emptyText: { textAlign: 'center', color: '#94a3b8', fontSize: 15, padding: 20 },
+
+  // ✅ time slot 
+  timeSlot: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' },
+  timeSlotActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+  timeSlotText: { fontSize: 14, fontWeight: '500', color: '#1e293b' },
+  timeSlotTextActive: { color: '#fff' },
 });
 
 
