@@ -9,11 +9,16 @@ import {
     FlatList,
     Alert,
     ActivityIndicator,
+    Modal,
+    TextInput,
 } from 'react-native';
 
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+
+
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
@@ -54,6 +59,12 @@ const formatDateTime = (dateStr: string, timeStr: string): string => {
 const BookingsListScreen = () => {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const [feedbackVisible, setfeedbackVisible] = useState(false);
+    const [feedbackBookingId, setFeedbackBookingId] = useState<string | null>(null);
+    const [rating, setRating] = useState<number>(0);
+    const [comment, setComment] = useState<string>('');
+    const [submittedFeedback, setsubmittedFeedback] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         loadBookings();
@@ -103,6 +114,51 @@ const BookingsListScreen = () => {
         );
     };
 
+    const submitFeedback = async () => {
+    if (!feedbackBookingId) return;
+    if (rating === 0) {
+        Alert.alert('Rating required', 'Please select at least 1 star');
+        return;
+    }
+
+    try {
+        const token = await SecureStore.getItemAsync('accessToken');
+
+        await axios.post(
+            // ⬇️ adjust if your real endpoint is different
+            //const API_URL = 'https://motospotbackend-production.up.railway.app';
+            //POST/bookings/{booking_id}/feedback Add feedback
+            `${API_URL}/bookings/${feedbackBookingId}/feedback`,
+            {
+                booking_id: feedbackBookingId,
+                rating,
+                comment: comment.trim() || null,
+            },
+            {
+                headers: { Authorization: `Bearer ${token}` },
+            }
+        );
+
+        Alert.alert('Thank you!', 'Your feedback has been submitted');
+
+        //Mark this booking as submitted locally
+        setsubmittedFeedback(prev => {
+            const newSet = new Set(prev);
+            newSet.add(feedbackBookingId!);
+            return newSet;
+        });
+        setfeedbackVisible(false);
+        setFeedbackBookingId(null);
+        setRating(0);
+        setComment('');
+        // optional: later we can refresh bookings or update local state
+    } catch (error) {
+        console.log('Feedback error:', error);
+        Alert.alert('Error', 'Could not submit feedback. Try again.');
+    }
+};
+
+
     const getStatusConfig = (status: string) => {
         const config: Record<string, { color: string; bgColor: string }> = {
             confirmed: { color: '#10b981', bgColor: '#d1fae5' },
@@ -140,6 +196,21 @@ const BookingsListScreen = () => {
             <Text style={styles.emptySubtitle}>Your active service bookings will appear here</Text>
         </View>
     );
+
+    const renderStars = () => {
+    const stars = [1, 2, 3, 4, 5];
+    return (
+        <View style={styles.starsRow}>
+            {stars.map((s) => (
+                <TouchableOpacity key={s} onPress={() => setRating(s)}>
+                    <Text style={[styles.star, rating >= s && styles.starActive]}>
+                        ★
+                    </Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
+};
 
     if (loading) {
         return (
@@ -190,8 +261,10 @@ const BookingsListScreen = () => {
                         </Text>
 
                         {/* Address */}
+                        
+
                         <Text style={styles.addressText}>
-                            {item.manual_address || item.pickup_address ? '📍 Address set' : 'No address provided'}
+                            {item['manual_address'] || item['pickup_address'] || '📍 No address provided'}
                         </Text>
 
                         {/* Notes */}
@@ -200,7 +273,7 @@ const BookingsListScreen = () => {
                         ) : null}
 
                         {/* ✅ Cancel only for 'confirmed' — not for in-progress bookings */}
-                        {item.status === 'confirmed' && (
+                        {item.status === 'confirmed' && !submittedFeedback.has(item.id) && (
                             <TouchableOpacity
                                 style={styles.cancelButton}
                                 onPress={() => handleCancel(item.id)}
@@ -208,11 +281,66 @@ const BookingsListScreen = () => {
                                 <Text style={styles.cancelButtonText}>Cancel Booking</Text>
                             </TouchableOpacity>
                         )}
+
+                        {/* Feedback button only for completed bookings */}
+                        {item.status === 'completed' && (
+                            <TouchableOpacity
+                            style={styles.feedbackButton}
+                            onPress={() => {
+                                setFeedbackBookingId(item.id);
+                                setRating(0);
+                                setComment('');
+                                setfeedbackVisible(true);
+                            }}
+
+                            >
+                                <Text style={styles.feedbackButtonText}> Rate Service</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
                 style={styles.list}
                 contentContainerStyle={styles.container}
             />
+            <Modal
+    visible={feedbackVisible}
+    transparent
+    animationType="slide"
+    onRequestClose={() => setfeedbackVisible(false)}
+>
+    <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Rate your service</Text>
+
+            {renderStars()}
+
+            <TextInput
+                style={styles.commentInput}
+                placeholder="Add a note (optional)"
+                multiline
+                value={comment}
+                onChangeText={setComment}
+            />
+
+            <View style={styles.modalButtonsRow}>
+                <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancel]}
+                    onPress={() => setfeedbackVisible(false)}
+                >
+                    <Text style={styles.modalCancelText}>Later</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.modalButton, styles.modalSubmit]}
+                    onPress={submitFeedback}
+                >
+                    <Text style={styles.modalSubmitText}>Submit</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    </View>
+</Modal>
+
         </SafeAreaView>
     );
 };
@@ -293,6 +421,87 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     cancelButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+        feedbackButton: {
+        backgroundColor: '#3b82f6',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    feedbackButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+    },
+    modalContent: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    starsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    star: {
+        fontSize: 32,
+        color: '#d1d5db',
+        marginHorizontal: 4,
+    },
+    starActive: {
+        color: '#facc15',
+    },
+    commentInput: {
+        minHeight: 80,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+        padding: 10,
+        textAlignVertical: 'top',
+        fontSize: 14,
+        color: '#111827',
+        marginBottom: 16,
+    },
+    modalButtonsRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    modalButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        marginLeft: 8,
+    },
+    modalCancel: {
+        backgroundColor: '#e5e7eb',
+    },
+    modalSubmit: {
+        backgroundColor: '#3b82f6',
+    },
+    modalCancelText: {
+        color: '#111827',
+        fontWeight: '500',
+    },
+    modalSubmitText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+
 });
 
 export default BookingsListScreen;
