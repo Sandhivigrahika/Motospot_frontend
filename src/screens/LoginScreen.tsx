@@ -1,4 +1,4 @@
-import React, { useState,  useEffect } from 'react'; //React basics + state/effect hooks
+import React, { useState } from 'react';
 import {
   View,
   Button,
@@ -7,202 +7,236 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
-} from 'react-native'; //UI Components
+  Image,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import axios from 'axios';
+import * as WebBrowser from 'expo-web-browser';
+import { useAuth } from '../context/AuthContext';
 
-import axios from 'axios';  // Install: npm install axios //makes http requests to you FASTAPI Backend
-import * as WebBrowser from 'expo-web-browser'; // Opens external browser for google login
-import * as SecureStore from 'expo-secure-store';  //encrypted storage for JWT Tokens
-import {useAuth} from '../context/AuthContext';
-
-
-
-
-const API_URL = 'https://motospotbackend-production.up.railway.app';  // Your FastAPI backend
+const API_URL = 'https://motospotbackend-production.up.railway.app';
 
 export default function LoginScreen({ navigation }: any) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
-  const {signIn} = useAuth();
-  const {devSignIn} = useAuth();
+  const { devSignIn } = useAuth();
 
-  //Google auth setup
   const loginWithGoogle = async () => {
     try {
       const res = await axios.get(`${API_URL}/auth/google/login`);
-      await WebBrowser.openBrowserAsync(res.data.auth_url)
+      await WebBrowser.openBrowserAsync(res.data.auth_url);
     } catch (err) {
-      Alert.alert('Error', 'Unable to start Google Login')
+      Alert.alert('Error', 'Unable to start Google Login');
     }
-  }
-
-  // request= "Is google Ready?" (true/false)
-  //response= "What did google return" (success/error/null)
-  //promptAsync = "Function to start Google Login"
+  };
 
   const sendOTP = async () => {
+    if (name.trim().length < 2) {
+      Alert.alert('Error', 'Enter your name');
+      return;
+    }
 
-  if (name.trim().length<2) {
-    Alert.alert('Error', 'Enter your name');
-    return;
-  }
+    if (phone.length !== 10) {
+      Alert.alert('Error', 'Enter valid 10-digit phone number');
+      return;
+    }
 
-  if (phone.length !== 10) {
-    Alert.alert('Error', 'Enter valid 10-digit phone number');
-    return;
-  }
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    const res = await axios.post(`${API_URL}/auth/send-otp`, 
-      { name: name.trim(),
-        phone, },
-      {
-        timeout: 15000,
-        headers: {'Content-Type': 'application/json'}
-      }
-    );
+    try {
+      const res = await axios.post(
+        `${API_URL}/auth/send-otp`,
+        {
+          name: name.trim(),
+          phone,
+        },
+        {
+          timeout: 15000,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-    console.log('SEND OTP SUCCESS:', res.data); //debug
-    Alert.alert('Success', `OTP sent to ${phone}`);
-    navigation.navigate('OTP', {phone});
-  } catch (error: any) {
-    console.log('SEND OTP ERROR: ',  {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
-    }); //debug
-    Alert.alert('Error', error.response?.data?.detail || error.message || 'Failed to send otp.');
-  } finally {
-    setLoading(false)
-  }
-};
+      console.log('SEND OTP SUCCESS:', res.data);
+      Alert.alert('Success', `OTP sent to ${phone}`);
+      navigation.navigate('OTP', { phone });
+    } catch (error: any) {
+      console.log('SEND OTP ERROR: ', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
 
-  
+      Alert.alert(
+        'Error',
+        error.response?.data?.detail || error.message || 'Failed to send otp.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Motospot </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.logoSection}>
+          <Image
+            source={require('../../assets/motopsaot_logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your name"
-        value={name}
-        onChangeText={setName}
-        autoCapitalize="words"
+        <View style={styles.formSection}>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your name"
+            placeholderTextColor="#8b8b8b"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+          />
 
-      />
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Enter phone number"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        maxLength={10}
-      />
-      
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={sendOTP}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? 'Sending...' : 'Login via OTP'}
-        </Text>
-      </TouchableOpacity>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter phone number"
+            placeholderTextColor="#8b8b8b"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            maxLength={10}
+          />
 
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={sendOTP}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'Sending...' : 'Login via OTP'}
+            </Text>
+          </TouchableOpacity>
 
-      <View style={styles.divider}>
-        <Text style={styles.orText}> OR </Text>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={loginWithGoogle}
+          >
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          {__DEV__ && (
+            <View style={styles.devButton}>
+              <Button
+                title="🔧 Skip Login (Dev Only)"
+                onPress={devSignIn}
+                color="#84cc16"
+              />
+            </View>
+          )}
+        </View>
       </View>
-
-      <TouchableOpacity
-        style={styles.googleButton}
-        onPress={loginWithGoogle}
-
-        >
-          <Text style ={styles.googleButtonText}> Continue with Google</Text>
-      </TouchableOpacity>
-
-
-      {__DEV__ && (
-                <View style={styles.devButton}>
-                    <Button
-                        title="🔧 Skip Login (Dev Only)"
-                        onPress={devSignIn}
-                        color="#FF6B35"
-                    />
-                </View>
-      ) }
-      
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#000000fa',
+  },
   container: {
     flex: 1,
-    padding: 24,
+    paddingHorizontal: 24,
+    backgroundColor: '#0000001f',
     justifyContent: 'center',
-    backgroundColor: '#f8fafc',
   },
-   devButton: {
-    marginTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#ccc',
-    paddingTop: 20,
+  logoSection: {
+    flex: 1.4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 10
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1e293b',
+  logo: {
+    width: '200%' ,
+    height: 300,
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#d4d4d4',
     textAlign: 'center',
-    marginBottom: 40,
+    fontWeight: '500',
+  },
+  formSection: {
+    flex: 0.9,
+    width: '100%',
+    justifyContent: 'center',
+    paddingBottom: 20,
   },
   input: {
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#262626',
+    borderRadius: 14,
     padding: 16,
-    fontSize: 18,
-    backgroundColor: 'white',
-    marginBottom: 24,
+    fontSize: 17,
+    backgroundColor: '#000000',
+    color: '#ffffff',
+    marginBottom: 18,
   },
   button: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#84cc16',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
+    marginTop: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: '#4b5563',
   },
   buttonText: {
-    color: 'white',
+    color: '#000000',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   divider: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24, 
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#262626',
   },
   orText: {
-    fontSize: 16,
-    color: '#64748b',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 16,
+    fontSize: 14,
+    color: '#a3a3a3',
+    paddingHorizontal: 12,
+    fontWeight: '600',
   },
   googleButton: {
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#2f2f2f',
+    backgroundColor: '#111111',
     padding: 16,
-    borderRadius: 12,
-    alignItems: 'center'
+    borderRadius: 14,
+    alignItems: 'center',
   },
   googleButtonText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#1e293b'
-  }
-}); 
+    color: '#ffffff',
+  },
+  devButton: {
+    marginTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#1f1f1f',
+    paddingTop: 20,
+  },
+});
