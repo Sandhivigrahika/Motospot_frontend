@@ -58,8 +58,9 @@ export default function LoginScreen({ navigation }: any) {
       );
 
       console.log('SEND OTP SUCCESS:', res.data);
-      Alert.alert('Success', `OTP sent to ${phone}`);
       navigation.navigate('OTP', { phone });
+      Alert.alert('Success', `OTP sent to ${phone}`);
+      
     } catch (error: any) {
       console.log('SEND OTP ERROR: ', {
         status: error.response?.status,

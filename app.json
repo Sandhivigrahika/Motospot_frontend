@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MotospotApp",
-    "slug": "MotospotApp",
+    "slug": "motospot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -30,7 +30,14 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
-    ]
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f53ede52-5490-45ad-9923-d33e8a9dc310"
+      }
+    },
+    "owner": "neelhans007s-organization"
   }
 }

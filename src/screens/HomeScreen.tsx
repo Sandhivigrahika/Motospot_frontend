@@ -43,7 +43,7 @@ export default function HomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
 
   const { signOut, devSignIn, isAuthenticated } = useAuth();
-  const { latestAddress, loadingAddresses, fetchAddresses } = useAddress();
+  const { addresses, latestAddress, isLoading: loadingAddresses, refetch: refetchAddresses} = useAddress();
 
   const loadUserAndBikes = async () => {
     try {
@@ -55,7 +55,7 @@ export default function HomeScreen({ navigation }: any) {
         return;
       }
 
-      fetchAddresses(token);
+      refetchAddresses();
 
       const storedUser = await SecureStore.getItemAsync('user');
 

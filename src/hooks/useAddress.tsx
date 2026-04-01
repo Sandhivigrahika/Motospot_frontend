@@ -1,49 +1,60 @@
-//src/hooks/useAddress
-
-import { useState, useCallback } from 'react';
+//src/hooks/useAddress.ts
+import { useQuery } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStorage from 'expo-secure-store';
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+
+
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
+export const ADDRESSES_KEY = 'motospot_my_address_cache';
+export const MY_ADDRESS_QUERY_KEY = ['myAddresses']; // Shared query key
 
-export interface Address { //typescript type safety
+
+export interface Address {
   id: string;
   label: string;
   address_line: string;
   city: string;
   state: string;
   postal_code: string;
-  country: string | null;
+  country: string | null; 
 }
 
-export function useAddress() { // regular function= use prefix tell react " this is a hook", export means other files can import it.
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loadingAddresses, setLoadingAddresses] = useState(false);
+const fetchMyAddresses = async (): Promise<Address[]> => {
+  const token = await SecureStorage.getItemAsync('accessToken');
 
-  /* Two state variables — addresses holds the list fetched from backend (starts as empty array []), 
-  loadingAddresses is the spinner flag (starts as false). */
+  if (!token) {
+    throw new Error('No access token found');
+  }
 
-  const fetchAddresses = useCallback(async (tokenOverride?: string) => {
-  setLoadingAddresses(true);
-  try {
-    const token = tokenOverride || await SecureStore.getItemAsync('accessToken');
-    if (!token) return;
+  const res = await axios.get<Address[]>(`${API_URL}/address/my-addresses`, {
+    headers: {Authorization: `Bearer ${token}`}
+  });
 
-    const res = await axios.get(`${API_URL}/address/my-addresses`, {
-      headers: { Authorization: `Bearer ${token}` },
+  const addresses = res.data || [];
+  await AsyncStorage.setItem(ADDRESSES_KEY, JSON.stringify(addresses));
+  return addresses;
+
+};
+
+
+  export function useAddress() {
+    const query = useQuery ({
+      queryKey: MY_ADDRESS_QUERY_KEY,
+      queryFn: fetchMyAddresses,
+      staleTime:1000 *5, //change in production
+      gcTime: 1000 *60 *30
     });
 
-    setAddresses(res.data || []);
-  } catch (err: any) {
-    console.error('Address fetch error:', err.response?.data || err.message);
-  } finally {
-    setLoadingAddresses(false);
+
+    //latest address = first item (most recently added)
+    const latestAddress = (query.data ?? []).length >0 ? (query.data ?? []) [0]:
+    null;
+
+    return {
+      ...query,
+      addresses: query.data ?? [],
+      latestAddress,
+    };
   }
-}, []);
-
-
-  // Latest address = first item (most recently added)
-  const latestAddress = addresses.length > 0 ? addresses[0] : null;
-
-  return { addresses, latestAddress, loadingAddresses, fetchAddresses };
-}
