@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
-  Button,
   Text,
   TextInput,
   TouchableOpacity,
   Alert,
   StyleSheet,
   Image,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import axios from 'axios';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +23,8 @@ export default function LoginScreen({ navigation }: any) {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const { devSignIn } = useAuth();
+
+  const phoneInputRef = useRef<TextInput>(null);
 
   const loginWithGoogle = async () => {
     try {
@@ -60,7 +64,6 @@ export default function LoginScreen({ navigation }: any) {
       console.log('SEND OTP SUCCESS:', res.data);
       navigation.navigate('OTP', { phone });
       Alert.alert('Success', `OTP sent to ${phone}`);
-      
     } catch (error: any) {
       console.log('SEND OTP ERROR: ', {
         status: error.response?.status,
@@ -79,165 +82,201 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.logoSection}>
-          <Image
-            source={require('../../assets/motopsaot_logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          
-        </View>
-
-        <View style={styles.formSection}>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your name"
-            placeholderTextColor="#8b8b8b"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Enter phone number"
-            placeholderTextColor="#8b8b8b"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            maxLength={10}
-          />
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={sendOTP}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Sending...' : 'Login via OTP'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={loginWithGoogle}
-          >
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          {__DEV__ && (
-            <View style={styles.devButton}>
-              <Button
-                title="🔧 Skip Login (Dev Only)"
-                onPress={devSignIn}
-                color="#84cc16"
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAwareScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid={true}
+          extraScrollHeight={80}
+          extraHeight={100}
+          keyboardOpeningTime={0}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            <View style={styles.logoSection}>
+              <Image
+                source={require('../../assets/motospot_logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
               />
             </View>
-          )}
-        </View>
-      </View>
+
+            <View style={styles.formSection}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your name"
+                placeholderTextColor="#8b8b8b"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => phoneInputRef.current?.focus()}
+              />
+
+              <TextInput
+                ref={phoneInputRef}
+                style={styles.input}
+                placeholder="Enter phone number"
+                placeholderTextColor="#8b8b8b"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                maxLength={10}
+                returnKeyType="done"
+                onSubmitEditing={sendOTP}
+              />
+
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={sendOTP}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Sending...' : 'Login via OTP'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.orText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <TouchableOpacity
+                style={styles.googleButton}
+                onPress={loginWithGoogle}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </TouchableOpacity>
+
+              {__DEV__ && (
+                <TouchableOpacity
+                  style={styles.devLoginButton}
+                  onPress={devSignIn}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.devLoginText}>🔧 Skip Login (Dev Only)</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </KeyboardAwareScrollView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000fa',
+    backgroundColor: '#0b0b0b',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   container: {
     flex: 1,
-    paddingHorizontal: 24,
-    backgroundColor: '#0000001f',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   logoSection: {
-    flex: 1.4,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 10
+    marginTop: 8,
+    marginBottom: 18,
   },
   logo: {
-    width: '200%' ,
+    width: 400,
     height: 300,
-    marginBottom: 8,
-  },
-  tagline: {
-    fontSize: 16,
-    color: '#d4d4d4',
-    textAlign: 'center',
-    fontWeight: '500',
   },
   formSection: {
-    flex: 0.9,
     width: '100%',
     justifyContent: 'center',
-    paddingBottom: 20,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#262626',
+    borderColor: '#2f2f2f',
     borderRadius: 14,
-    padding: 16,
-    fontSize: 17,
-    backgroundColor: '#000000',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    backgroundColor: '#111111',
     color: '#ffffff',
-    marginBottom: 18,
+    marginBottom: 14,
   },
   button: {
-    backgroundColor: '#84cc16',
-    padding: 16,
-    borderRadius: 14,
+    backgroundColor: '#9bf542',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
+    marginTop: 2,
   },
   buttonDisabled: {
     backgroundColor: '#4b5563',
   },
   buttonText: {
-    color: '#000000',
-    fontSize: 18,
+    color: '#111111',
+    fontSize: 16,
     fontWeight: '700',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 18,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#262626',
+    backgroundColor: '#2a2a2a',
   },
   orText: {
+    color: '#8b8b8b',
     fontSize: 14,
-    color: '#a3a3a3',
-    paddingHorizontal: 12,
-    fontWeight: '600',
+    fontWeight: '500',
+    marginHorizontal: 12,
   },
   googleButton: {
     borderWidth: 1,
-    borderColor: '#2f2f2f',
+    borderColor: '#3a3a3a',
     backgroundColor: '#111111',
-    padding: 16,
-    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   googleButtonText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
   },
-  devButton: {
-    marginTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#1f1f1f',
-    paddingTop: 20,
+  devLoginButton: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#84cc16',
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  devLoginText: {
+    color: '#84cc16',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
