@@ -44,8 +44,6 @@ export default function AddressFormScreen() {
   const isEditing = !!existingAddress;
 
   const [loading, setLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
   const inputRefs = useRef<Partial<Record<FieldKey, TextInput | null>>>({});
 
   const [form, setForm] = useState<FormState>({
@@ -61,6 +59,19 @@ export default function AddressFormScreen() {
     setForm(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  const getAuthHeaders = async () => {
+    const token = await SecureStore.getItemAsync('accessToken');
+
+    if (!token) {
+      throw new Error('Missing access token');
+    }
+
+    return {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
+
   const handleSubmit = async () => {
     if (!form.address_line || !form.city || !form.state || !form.postal_code) {
       Alert.alert('Validation', 'Please fill Address Line, City, State, and Postal Code.');
@@ -68,9 +79,9 @@ export default function AddressFormScreen() {
     }
 
     setLoading(true);
+
     try {
-      const token = await SecureStore.getItemAsync('accessToken');
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = await getAuthHeaders();
 
       let res;
       if (isEditing) {
@@ -89,64 +100,24 @@ export default function AddressFormScreen() {
 
         if (isEditing) {
           const index = addresses.findIndex((a: any) => a.id === existingAddress.id);
-          if (index !== -1) {
-            addresses[index] = newAddress;
-          }
+          if (index !== -1) addresses[index] = newAddress;
         } else {
           addresses.push(newAddress);
         }
 
         await AsyncStorage.setItem(ADDRESS_KEY, JSON.stringify(addresses));
       } catch (e) {
-        console.log('Address cache failed:', e);
+        console.log('Address cache update failed:', e);
       }
 
       await queryClient.invalidateQueries({ queryKey: ['myAddresses'] });
       navigation.goBack();
     } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      Alert.alert(
-        'Error',
-        typeof detail === 'string' ? detail : JSON.stringify(detail || err.message)
-      );
+      const detail = err?.response?.data?.detail || err?.message || 'Failed to save address.';
+      Alert.alert('Error', typeof detail === 'string' ? detail : JSON.stringify(detail));
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDelete = () => {
-    Alert.alert('Remove Address', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          setDeleteLoading(true);
-          try {
-            const token = await SecureStore.getItemAsync('accessToken');
-            await axios.delete(`${API_URL}/address/${existingAddress.id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-
-            try {
-              const existing = await AsyncStorage.getItem(ADDRESS_KEY);
-              const addresses = existing ? JSON.parse(existing) : [];
-              const filtered = addresses.filter((a: any) => a.id !== existingAddress.id);
-              await AsyncStorage.setItem(ADDRESS_KEY, JSON.stringify(filtered));
-            } catch (e) {
-              console.log('Address cache delete failed:', e);
-            }
-
-            await queryClient.invalidateQueries({ queryKey: ['myAddresses'] });
-            navigation.goBack();
-          } catch {
-            Alert.alert('Error', 'Failed to remove address.');
-          } finally {
-            setDeleteLoading(false);
-          }
-        },
-      },
-    ]);
   };
 
   const FIELDS: {
@@ -198,9 +169,9 @@ export default function AddressFormScreen() {
           enableOnAndroid={true}
           enableAutomaticScroll={true}
           extraHeight={Platform.OS === 'android' ? 140 : 100}
-          extraScrollHeight={Platform.OS === 'android' ? 40 : 20}
-          keyboardOpeningTime={0}
-          resetScrollToCoords={{ x: 0, y: 0 }}
+          extraScrollHeight={Platform.OS === 'android' ? 80 : 40}
+          keyboardOpeningTime={250}
+          enableResetScrollToCoords={false}
         >
           <View style={styles.formCard}>
             <Text style={styles.label}>Label *</Text>
@@ -234,6 +205,15 @@ export default function AddressFormScreen() {
                   returnKeyType={index === FIELDS.length - 1 ? 'done' : 'next'}
                   blurOnSubmit={index === FIELDS.length - 1}
                   value={form[field]}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      const ref = inputRefs.current[field];
+                      if (ref) {
+                        // @ts-ignore
+                        inputRefs.current[field]?.measure?.(() => {});
+                      }
+                    }, 150);
+                  }}
                   onChangeText={(t) => update(field, t)}
                   onSubmitEditing={() => {
                     const nextField = FIELDS[index + 1];
@@ -257,21 +237,6 @@ export default function AddressFormScreen() {
                 </Text>
               </TouchableOpacity>
             )}
-
-            {isEditing && (
-              <TouchableOpacity
-                style={styles.deleteBtn}
-                onPress={handleDelete}
-                disabled={deleteLoading}
-                activeOpacity={0.85}
-              >
-                {deleteLoading ? (
-                  <ActivityIndicator color="#ef4444" />
-                ) : (
-                  <Text style={styles.deleteText}>Remove Address</Text>
-                )}
-              </TouchableOpacity>
-            )}
           </View>
         </KeyboardAwareScrollView>
       </TouchableWithoutFeedback>
@@ -290,7 +255,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     padding: 16,
-    paddingBottom: 140,
+    paddingBottom: 120,
     backgroundColor: '#f3f4f6',
   },
   formCard: {
@@ -302,6 +267,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
+    marginBottom: 40,
   },
   label: {
     fontSize: 13,
@@ -355,20 +321,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
-  },
-  deleteBtn: {
-    marginTop: 12,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  deleteText: {
-    color: '#ef4444',
-    fontWeight: '600',
-    fontSize: 15,
   },
   loadingSpinner: {
     marginTop: 24,

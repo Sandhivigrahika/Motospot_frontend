@@ -15,7 +15,6 @@ export const MY_BIKES_QUERY_KEY = ['myBikes'];
 
 export interface Bike {
     id: string | number;
-    registraton_number: string;
     company_name? : string;
     model_name?: string;
     purchase_year?: number;
@@ -54,7 +53,7 @@ export function useMyBikes() {
 
         queryKey: MY_BIKES_QUERY_KEY,
         queryFn: fetchMyBikes,
-        staleTime: 1000*60*5,
+        staleTime: 1000*10,
         gcTime: 1000 * 60 * 30,
         initialData: [],
     });

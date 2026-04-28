@@ -1,107 +1,133 @@
-//src/components/addressbar
+// src/components/AddressBar.tsx
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 
-import React from 'react'; //imports react core from react
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'; //imports UI components from react native
-import { Address } from '../hooks/useAddress'; // imports address typescript interface
-import { SafeAreaView } from 'react-native-safe-area-context'; 
-/* This defines what this component expects.
+type AddressBarProps = {
+  address?: {
+    label?: string;
+    address_line?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+  } | null;
+  loading?: boolean;
+  onPress?: () => void;
+};
 
-Meaning:
+const COLORS = {
+  bg: '#050505',
+  surface: '#0D0F10',
+  surfaceSoft: '#121416',
+  surfaceElevated: '#181B1D',
+  border: '#23272A',
+  text: '#F5F7F2',
+  textSecondary: '#C7CEC7',
+  textMuted: '#8B948C',
+  primary: '#A6F400',
+  primarySoft: 'rgba(166, 244, 0, 0.12)',
+};
 
-address → either an Address object OR null
+export default function AddressBar({ address, loading, onPress }: AddressBarProps) {
+  const title = loading
+    ? 'Fetching location...'
+    : address?.address_line
+    ? address.address_line
+    : 'Add your address';
 
-loading → true/false
+  const subtitle = loading
+    ? 'Please wait'
+    : address?.city || address?.state
+    ? [address?.label, address?.city, address?.state].filter(Boolean).join(' • ')
+    : 'Tap to select or save address';
 
-onPress → function with no parameters returning nothing
-
-This gives you:
-
-Autocomplete
-
-Compile-time safety
-
-Error prevention*/
-interface Props {
-  address: Address | null;
-  loading: boolean;
-  onPress: () => void;
-}
-//creates a functional component
-// Destructures props immediately
-// Applies type safety using : Props
-export default function AddressBar({ address, loading, onPress }: Props) {
   return (
-   <SafeAreaView style={styles.safeArea}>
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.75}>
-      <View style={styles.iconWrapper}>
-        <Text style={styles.pinIcon}>📍</Text>
-      </View>
-
-      <View style={styles.textWrapper}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={onPress}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel="Open address selection"
+    >
+      <View style={styles.iconWrap}>
         {loading ? (
-          <ActivityIndicator size="small" color="#10b981" />
-        ) : address ? (
-          <>
-            <Text style={styles.label} numberOfLines={1}>
-              {address.label || 'Home'}
-            </Text>
-            <Text style={styles.addressLine} numberOfLines={1}>
-              {address.address_line}, {address.city}
-            </Text>
-          </>
+          <ActivityIndicator size="small" color={COLORS.primary} />
         ) : (
-          <>
-            <Text style={styles.label}>Add your address</Text>
-            <Text style={styles.addressLine}>Tap to add a service location</Text>
-          </>
+          <Text style={styles.icon}>📍</Text>
         )}
       </View>
 
-      <Text style={styles.chevron}>›</Text>
+      <View style={styles.textWrap}>
+        <Text numberOfLines={1} style={styles.title}>
+          {title}
+        </Text>
+        <Text numberOfLines={1} style={styles.subtitle}>
+          {subtitle}
+        </Text>
+      </View>
+
+      <View style={styles.chevronWrap}>
+        <Text style={styles.chevron}>›</Text>
+      </View>
     </TouchableOpacity>
-    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: '#fff',
-  },
   container: {
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  iconWrapper: {
+
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 10,
   },
-  pinIcon: {
-    fontSize: 20,
+
+  icon: {
+    fontSize: 16,
+    color: COLORS.primary,
   },
-  textWrapper: {
+
+  textWrap: {
     flex: 1,
+    justifyContent: 'center',
   },
-  label: {
+
+  title: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text,
+    marginBottom: 2,
   },
-  addressLine: {
+
+  subtitle: {
     fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
+    fontWeight: '500',
+    color: COLORS.textMuted,
   },
+
+  chevronWrap: {
+    marginLeft: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   chevron: {
     fontSize: 22,
-    color: '#94a3b8',
-    marginLeft: 8,
+    lineHeight: 22,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });
