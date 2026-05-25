@@ -12,11 +12,13 @@ import {
   Keyboard,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { api } from '../api/client';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +30,7 @@ interface Company {
   id: string;
   company_name: string;
 }
+
 interface Model {
   id: string;
   model_name: string;
@@ -69,7 +72,7 @@ export default function BikeFormScreen() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await axios.get(`${API_URL}/user/companies`);
+        const res = await api.get(`${API_URL}/user/companies`);
         setCompanies(res.data || []);
       } catch {
         Alert.alert('Error', 'Failed to load companies');
@@ -96,7 +99,7 @@ export default function BikeFormScreen() {
 
     const load = async () => {
       try {
-        const res = await axios.get(`${API_URL}/user/bike-models`, {
+        const res = await api.get(`${API_URL}/user/bike-models`, {
           params: { company_id: companyValue },
         });
         setModels(res.data || []);
@@ -115,6 +118,25 @@ export default function BikeFormScreen() {
       if (match) setModelValue(String(match.id));
     }
   }, [models]);
+
+  const updateBikeCache = async (newBike: Bike) => {
+    try {
+      const existingStr = await AsyncStorage.getItem(BIKES_KEY);
+      const bikes = existingStr ? JSON.parse(existingStr) : [];
+
+      if (isEditing) {
+        const index = bikes.findIndex((b: Bike) => b.id === existingBike.id);
+        if (index !== -1) bikes[index] = newBike;
+      } else {
+        bikes.push(newBike);
+      }
+
+      await AsyncStorage.setItem(BIKES_KEY, JSON.stringify(bikes));
+      await queryClient.invalidateQueries({ queryKey: ['myBikes'] });
+    } catch (e) {
+      console.log('cache failed', e);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!companyValue || !modelValue || !form.registration_number || !form.purchase_year) {
@@ -147,7 +169,7 @@ export default function BikeFormScreen() {
         console.log('🔵 UPDATE URL:', `${API_URL}/bikes/${existingBike.id}`);
         console.log('🔵 UPDATE PAYLOAD:', JSON.stringify(payload, null, 2));
 
-        res = await axios.put(`${API_URL}/bikes/${existingBike.id}`, payload, { headers });
+        res = await api.put(`${API_URL}/bikes/${existingBike.id}`, payload, { headers });
         console.log('✅ UPDATE SUCCESS:', res.status, res.data);
         Alert.alert('Success', 'Bike updated! ✅');
       } else {
@@ -162,12 +184,17 @@ export default function BikeFormScreen() {
         console.log('🟢 CREATE URL:', `${API_URL}/bikes/add`);
         console.log('🟢 CREATE PAYLOAD:', JSON.stringify(payload, null, 2));
 
-        res = await axios.post(`${API_URL}/bikes/add`, payload, { headers });
+        res = await api.post(`${API_URL}/bikes/add`, payload, { headers });
         console.log('✅ CREATE SUCCESS:', res.status, res.data);
         Alert.alert('Success', 'Bike added! 🎉');
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['myBikes'] });
+      if (res?.data) {
+        await updateBikeCache(res.data);
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['myBikes'] });
+      }
+
       navigation.goBack();
     } catch (err: any) {
       console.log(
@@ -190,25 +217,6 @@ export default function BikeFormScreen() {
     }
   };
 
-  const updateBikeCache = async (newBike: Bike) => {
-    try {
-      const existingStr = await AsyncStorage.getItem(BIKES_KEY);
-      const bikes = existingStr ? JSON.parse(existingStr) : [];
-
-      if (isEditing) {
-        const index = bikes.findIndex((b: Bike) => b.id === existingBike.id);
-        if (index !== -1) bikes[index] = newBike;
-      } else {
-        bikes.push(newBike);
-      }
-
-      await AsyncStorage.setItem(BIKES_KEY, JSON.stringify(bikes));
-      await queryClient.invalidateQueries({ queryKey: ['myBikes'] });
-    } catch (e) {
-      console.log('cache failed', e);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -225,6 +233,24 @@ export default function BikeFormScreen() {
           resetScrollToCoords={{ x: 0, y: 0 }}
         >
           <View style={styles.formCard}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Enter bike details</Text>
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    'Why we collect this',
+                    'Vehicle number helps us track your orders efficiently'
+                  )
+                }
+                activeOpacity={0.7}
+                style={styles.infoButton}
+                accessibilityRole="button"
+                accessibilityLabel="Why we collect vehicle number"
+              >
+                <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.label}>Brand *</Text>
             <DropDownPicker
               open={openCompany}
@@ -275,7 +301,7 @@ export default function BikeFormScreen() {
               returnKeyType="next"
             />
 
-            <Text style={styles.label}>Purchase Year *</Text>
+            <Text style={[styles.label, { marginTop: 16 }]}>Purchase Year *</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. 2020"
@@ -335,6 +361,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginRight: 6,
+  },
+  infoButton: {
+    padding: 2,
   },
   label: {
     fontSize: 13,

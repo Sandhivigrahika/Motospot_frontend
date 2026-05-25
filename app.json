@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MotospotApp",
+    "name": "Motospot",
     "slug": "motospot",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,11 +18,11 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#050505"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.MotospotApp"
+      "package": "com.anonymous.motospotapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,7 +31,8 @@
       "expo-secure-store",
       "expo-web-browser",
       "@react-native-community/datetimepicker",
-      "expo-font"
+      "expo-font",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {

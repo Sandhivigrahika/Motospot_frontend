@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { api } from '../api/client';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
@@ -21,11 +22,9 @@ type SupportRequestModalProps = {
 };
 
 const ENQUIRY_OPTIONS = [
-  { label: 'General Enquiry', value: 'GENERAL_ENQUIRY' },
-  { label: 'Booking Issue', value: 'BOOKING_ISSUE' },
-  { label: 'Payment Issue', value: 'PAYMENT_ISSUE' },
-  { label: 'Service Complaint', value: 'SERVICE_COMPLAINT' },
-  { label: 'Pickup / Delivery', value: 'PICKUP_DELIVERY' },
+  { label: 'New Booking', value: 'NEW_BOOKING' },
+  { label: 'Previous Bookings', value: 'PAST_BOOKING' },
+  { label: 'Payment Related', value: 'PAYMENT' },
   { label: 'Other', value: 'OTHER' },
 ];
 
@@ -54,54 +53,64 @@ const SupportRequestModal: React.FC<SupportRequestModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const token = await SecureStore.getItemAsync('accessToken');
+    const token = await SecureStore.getItemAsync('accessToken');
 
-      if (!token) {
-        Alert.alert('Error', 'Please login again');
+    if (!token) {
+      Alert.alert('Error', 'Please login again');
+      return;
+    }
+
+    const payload = {
+      enquiry_category: selectedCategory,
+      message: message.trim() || undefined,
+    };
+
+    const response = await api.post('/support/', payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 200 || response.status === 201) {
+      Alert.alert('Request sent', `Support request created under ${selectedLabel}`);
+      resetState();
+      onClose();
+    } else {
+      Alert.alert('Success', 'Support request created');
+      resetState();
+      onClose();
+    }
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+
+      const isAuthError =
+        status === 401 ||
+        detail === 'Token expired' ||
+        detail === 'Could not validate credentials';
+
+      if (isAuthError) {
         return;
       }
 
-      const payload = {
-        enquiry_category: selectedCategory,
-        message: message.trim() || undefined,
-      };
-
-      const response = await axios.post(`${API_URL}/support/`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 200 || response.status === 201) {
-        Alert.alert('Request sent', `Support request created under ${selectedLabel}`);
-        resetState();
-        onClose();
-      } else {
-        Alert.alert('Success', 'Support request created');
-        resetState();
-        onClose();
-      }
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const detail = error.response?.data?.detail;
-
-        if (typeof detail === 'string') {
-          Alert.alert('Error', detail);
-        } else {
-          Alert.alert('Error', 'Could not create support request');
-        }
-      } else if (error instanceof Error) {
-        Alert.alert('Error', error.message);
+      if (typeof detail === 'string') {
+        Alert.alert('Error', detail);
       } else {
         Alert.alert('Error', 'Could not create support request');
       }
-    } finally {
-      setLoading(false);
+    } else if (error instanceof Error) {
+      Alert.alert('Error', error.message);
+    } else {
+      Alert.alert('Error', 'Could not create support request');
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>

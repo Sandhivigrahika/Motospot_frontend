@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { api } from '../api/client';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { PhoneCard } from '../components/PhoneCard';
@@ -73,7 +74,7 @@ const BookingScreen = () => {
   const fetchServices = async () => {
     try {
       setServicesLoading(true);
-      const { data } = await axios.get(`${API_URL}/Services/services`);
+      const { data } = await api.get(`${API_URL}/Services/services`);
       const normalized = Array.isArray(data)
         ? data
             .filter((item) => item?.name)
@@ -96,7 +97,12 @@ const BookingScreen = () => {
     }, [refetchBikes, refetchAddresses])
   );
 
-  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+  const formatDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
   const selectedBikeName =
     bikes.find((b) => String(b.id) === selectedBike)?.registration_number ||
@@ -172,7 +178,7 @@ const BookingScreen = () => {
         service_requested: serviceRequested,
       };
 
-      const response = await axios.post(`${API_URL}/bookings/`, payload, {
+      const response = await api.post(`${API_URL}/bookings/`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -182,14 +188,22 @@ const BookingScreen = () => {
       } else {
         Alert.alert('Success', 'Booking created!');
       }
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        Alert.alert('Error', String(error.response?.data?.detail || 'Booking Failed'));
-      } else if (error instanceof Error) {
-        Alert.alert('Error', error.message);
-      } else {
-        Alert.alert('Error', 'Booking Failed');
-      }
+    }  catch (error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    const detail = error.response?.data?.detail;
+
+    if (status === 401 || detail === 'Token expired' || detail === 'Could not validate credentials') {
+      return;
+    }
+
+    Alert.alert('Error', String(detail || 'Booking Failed'));
+  } else if (error instanceof Error) {
+    Alert.alert('Error', error.message);
+  } else {
+    Alert.alert('Error', 'Booking Failed');
+  }
+
     } finally {
       setLoading(false);
     }
@@ -328,17 +342,21 @@ const BookingScreen = () => {
         </View>
 
         {showDatePicker && (
-          <DateTimePicker
-            value={preferredDate}
-            mode="date"
-            display="default"
-            minimumDate={new Date()}
-            onChange={(_, date) => {
-              setShowDatePicker(false);
-              if (date) setPreferredDate(date);
-            }}
-          />
-        )}
+  <DateTimePicker
+    value={preferredDate}
+    mode="date"
+    display="default"
+    minimumDate={new Date()}
+    onChange={(_, date) => {
+      setShowDatePicker(false);
+      if (date) {
+        setPreferredDate(
+          new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0)
+        );
+      }
+    }}
+  />
+)}
 
         <Text style={styles.label}>Select Time</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>

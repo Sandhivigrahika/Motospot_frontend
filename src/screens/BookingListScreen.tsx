@@ -19,6 +19,7 @@ import {
 
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
@@ -58,6 +59,7 @@ const COLORS = {
   text: '#F5F7F2',
   textSecondary: '#C7CEC7',
   textMuted: '#8B948C',
+  textDark: '#050505',
 
   primary: '#A6F400',
   primaryDark: '#7ECC00',
@@ -114,19 +116,35 @@ const BookingsListScreen = () => {
   }, []);
 
   const loadBookings = async () => {
-    try {
-      const token = await SecureStore.getItemAsync('accessToken');
-      const response = await axios.get(`${API_URL}/bookings/me?status=active`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setBookings(response.data);
-    } catch (error) {
-      console.log('Bookings load error:', error);
-      Alert.alert('Error', 'Failed to load bookings');
-    } finally {
-      setLoading(false);
+  try {
+    const token = await SecureStore.getItemAsync('accessToken');
+
+    const response = await api.get('/bookings/me?status=active', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    setBookings(response.data);
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+
+      const isAuthError =
+        status === 401 ||
+        detail === 'Token expired' ||
+        detail === 'Could not validate credentials';
+
+      if (isAuthError) {
+        return;
+      }
     }
-  };
+
+    console.log('Bookings load error:', error);
+    Alert.alert('Error', 'Failed to load bookings');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCancel = async (bookingId: string) => {
     Alert.alert(
@@ -140,7 +158,7 @@ const BookingsListScreen = () => {
           onPress: async () => {
             try {
               const token = await SecureStore.getItemAsync('accessToken');
-              await axios.post(
+              await api.post(
                 `${API_URL}/bookings/${bookingId}/cancel`,
                 {},
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -166,7 +184,7 @@ const BookingsListScreen = () => {
     try {
       const token = await SecureStore.getItemAsync('accessToken');
 
-      await axios.post(
+      await api.post(
         `${API_URL}/bookings/${feedbackBookingId}/feedback`,
         {
           booking_id: feedbackBookingId,

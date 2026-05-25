@@ -17,6 +17,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { api } from '../api/client';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -85,10 +86,10 @@ export default function AddressFormScreen() {
 
       let res;
       if (isEditing) {
-        res = await axios.put(`${API_URL}/address/${existingAddress.id}`, form, { headers });
+        res = await api.put(`${API_URL}/address/${existingAddress.id}`, form, { headers });
         Alert.alert('Success', 'Address updated! ✅');
       } else {
-        res = await axios.post(`${API_URL}/address/add`, form, { headers });
+        res = await api.post(`${API_URL}/address/add`, form, { headers });
         Alert.alert('Success', 'Address saved! 📍');
       }
 

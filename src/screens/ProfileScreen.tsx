@@ -279,7 +279,7 @@ export default function ProfileScreen() {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Contact</Text>
               <View style={styles.sectionPill}>
-                <Text style={styles.sectionPillText}>Editable</Text>
+                <Text style={styles.sectionPillText}>Tap to update</Text>
               </View>
             </View>
 
@@ -377,7 +377,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={styles.supportRow}
-              onPress={() => Linking.openURL('tel:+919876543210')}
+              onPress={() => Linking.openURL('tel:+917903499148')}
               activeOpacity={0.85}
             >
               <View style={styles.supportIcon}>
@@ -385,7 +385,7 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportLabel}>Phone</Text>
-                <Text style={styles.supportValue}>+91 98765 43210</Text>
+                <Text style={styles.supportValue}>+91 79034 99148</Text>
               </View>
               <Text style={styles.rowChevron}>›</Text>
             </TouchableOpacity>

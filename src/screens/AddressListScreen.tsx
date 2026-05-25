@@ -12,6 +12,7 @@ import {
 
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { api } from '../api/client';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
@@ -39,7 +40,7 @@ export default function AddressListScreen({navigation}: any) {
             }
 
             console.log("Token found:", token ? 'yes': 'no');
-            const addressesRes = await axios.get(`${API_URL}/address/my-addresses`, {
+            const addressesRes = await api.get(`${API_URL}/address/my-addresses`, {
                 headers: {Authorization: `Bearer ${token}`}
             });
 

@@ -3,8 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStorage from 'expo-secure-store';
 import axios from 'axios';
-
-
+import { api } from '../api/client';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 export const ADDRESSES_KEY = 'motospot_my_address_cache';
@@ -28,7 +27,7 @@ const fetchMyAddresses = async (): Promise<Address[]> => {
     throw new Error('No access token found');
   }
 
-  const res = await axios.get<Address[]>(`${API_URL}/address/my-addresses`, {
+  const res = await api.get<Address[]>(`${API_URL}/address/my-addresses`, {
     headers: {Authorization: `Bearer ${token}`}
   });
 

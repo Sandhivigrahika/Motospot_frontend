@@ -34,8 +34,14 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const queryClient = new QueryClient({
+  
   defaultOptions: {
-    queries: { staleTime: 1000 * 60 * 5, gcTime: 1000 * 60 * 30, retry: 2 },
+    queries: { 
+      staleTime: 1000 * 60 * 5, 
+      gcTime: 1000 * 60 * 30, 
+      retry: 0,  // ← Don't retry 401s
+      
+    },
   },
 });
 
@@ -169,6 +175,8 @@ function AppStack() {
 
 function Navigation() {
   const { isAuthenticated, loading } = useAuth();
+
+  console.log('NAV STATE', {isAuthenticated, loading});
 
   if (loading) {
     return (

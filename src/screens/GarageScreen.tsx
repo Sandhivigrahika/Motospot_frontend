@@ -31,6 +31,10 @@ const COLORS = {
 
   primary: '#A6F400',
   primarySoft: 'rgba(166, 244, 0, 0.12)',
+
+  primaryDim: '#4F7D08',
+  primaryDimSoft:  'rgba(79, 125, 8, 0.14)',
+  primaryDimBorder: 'rgba(79, 125, 8, 0.28)',
 };
 
 export default function GarageScreen({ navigation }: any) {
@@ -345,13 +349,15 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     borderRadius: 14,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDim,
     justifyContent: 'center',
+    borderWidth: 1,
     alignItems: 'center',
+    borderColor: COLORS.primaryDimBorder,
   },
 
   editButtonText: {
-    color: '#050505',
+    color: '#F5F7F2',
     fontSize: 15,
     fontWeight: '800',
   },

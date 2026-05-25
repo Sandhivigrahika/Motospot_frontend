@@ -1,50 +1,56 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
   StyleSheet,
   TouchableWithoutFeedback,
   Keyboard,
+  Platform,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import axios from 'axios';
+import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
+const OTP_LENGTH = 4;
+const RETRY_DELAY = 60;
 
 export default function OTPScreen({ route, navigation }: any) {
   const { phone } = route.params;
-  const [otp, setOtp] = useState('');
-  const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
 
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(RETRY_DELAY);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const inputRef = useRef<TextInput>(null);
+  
+
   const verifyOTP = async () => {
-    if (otp.length !== 4) {
-      Alert.alert('Error', 'Enter valid 4-digit OTP');
+    if (loading) return;
+
+    if (otp.length !== OTP_LENGTH) {
+      setErrorMessage('Enter the 4-digit code');
       return;
     }
 
-    console.log('Sending OTP Verify:', { phone, otp });
     setLoading(true);
+    setErrorMessage('');
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         `${API_URL}/auth/verify-otp`,
-        {
-          phone,
-          otp,
-        },
+        { phone, otp },
         {
           timeout: 10000,
           headers: { 'Content-Type': 'application/json' },
         }
       );
-
-      console.log('OTP Success:', res.data);
 
       await signIn(
         res.data.access_token,
@@ -52,12 +58,80 @@ export default function OTPScreen({ route, navigation }: any) {
         res.data.user
       );
     } catch (error: any) {
-      console.log('Full OTP Error:', error.response?.data || error.message);
-      Alert.alert('Error', error.response?.data?.detail || 'Invalid OTP');
+      const message =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        (error.response?.status === 500
+          ? 'Something went wrong. Please try again.'
+          : null) ||
+        'Incorrect code. Please try again.';
+
+      setErrorMessage(message);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleChangeOTP = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '').slice(0, OTP_LENGTH);
+    setOtp(cleaned);
+
+    if (errorMessage) {
+      setErrorMessage('');
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+
+    const timer = setTimeout(() => {
+      setSecondsLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [secondsLeft]);
+
+
+
+  const handleRetry = () => {
+    if (secondsLeft > 0) return;
+    navigation.goBack();
+  };
+
+  const renderOtpBoxes = () => {
+    return Array.from({ length: OTP_LENGTH }).map((_, index) => {
+      const digit = otp[index] ?? '';
+      const isActive = index === otp.length && otp.length < OTP_LENGTH;
+      const isFilled = !!digit;
+
+      return (
+        <View
+          key={index}
+          style={[
+            styles.otpBox,
+            isFilled && styles.otpBoxFilled,
+            isActive && styles.otpBoxActive,
+            !!errorMessage && styles.otpBoxError,
+          ]}
+        >
+          <Text style={styles.otpDigit}>{digit}</Text>
+        </View>
+      );
+    });
+  };
+
+  const isRetryDisabled = secondsLeft > 0;
+  const retryLabel = isRetryDisabled ? `Retry in ${secondsLeft}s` : 'Retry';
+  const canSubmit = otp.length === OTP_LENGTH && !loading;
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -66,7 +140,7 @@ export default function OTPScreen({ route, navigation }: any) {
           style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          enableOnAndroid={true}
+          enableOnAndroid
           extraScrollHeight={80}
           extraHeight={100}
           keyboardOpeningTime={0}
@@ -76,23 +150,47 @@ export default function OTPScreen({ route, navigation }: any) {
             <Text style={styles.title}>Verify OTP</Text>
             <Text style={styles.subtitle}>Sent to {phone}</Text>
 
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => inputRef.current?.focus()}
+              style={styles.otpBoxesContainer}
+            >
+              {renderOtpBoxes()}
+            </TouchableOpacity>
+
             <TextInput
-              style={styles.input}
-              placeholder="Enter 4 digit OTP"
-              placeholderTextColor="#8b8b8b"
+              ref={inputRef}
               value={otp}
-              onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              maxLength={4}
+              onChangeText={handleChangeOTP}
+              keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
+              inputMode="numeric"
+              maxLength={OTP_LENGTH}
               returnKeyType="done"
               onSubmitEditing={verifyOTP}
-              textAlign="center"
+              autoFocus
+              autoCorrect={false}
+              caretHidden
+              contextMenuHidden={false}
+              textContentType="oneTimeCode"
+              autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
+              importantForAutofill="yes"
+              accessible
+              accessibilityLabel="One-time password input"
+              style={styles.hiddenInput}
             />
 
+            {errorMessage ? (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            ) : (
+              <Text style={styles.helperText}>
+                Enter the 4-digit code sent to your phone
+              </Text>
+            )}
+
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, !canSubmit && styles.buttonDisabled]}
               onPress={verifyOTP}
-              disabled={loading}
+              disabled={!canSubmit}
               activeOpacity={0.85}
             >
               <Text style={styles.buttonText}>
@@ -101,11 +199,19 @@ export default function OTPScreen({ route, navigation }: any) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
+              style={styles.retryButton}
+              onPress={handleRetry}
+              disabled={isRetryDisabled}
               activeOpacity={0.85}
             >
-              <Text style={styles.backButtonText}>Change phone number</Text>
+              <Text
+                style={[
+                  styles.retryButtonText,
+                  isRetryDisabled && styles.retryButtonTextDisabled,
+                ]}
+              >
+                {retryLabel}
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAwareScrollView>
@@ -144,19 +250,55 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#8b8b8b',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 28,
   },
-  input: {
-    borderWidth: 1,
+  otpBoxesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  otpBox: {
+    flex: 1,
+    height: 62,
+    borderWidth: 1.5,
     borderColor: '#2f2f2f',
     borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    fontSize: 22,
     backgroundColor: '#111111',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpBoxFilled: {
+    borderColor: '#84cc16',
+  },
+  otpBoxActive: {
+    borderColor: '#9bf542',
+  },
+  otpBoxError: {
+    borderColor: '#ef4444',
+  },
+  otpDigit: {
     color: '#ffffff',
-    marginBottom: 16,
-    letterSpacing: 8,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    opacity: 0.01,
+    width: 1,
+    height: 1,
+  },
+  helperText: {
+    marginTop: 12,
+    color: '#6b7280',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 12,
+    color: '#ef4444',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   button: {
     backgroundColor: '#9bf542',
@@ -165,6 +307,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 22,
   },
   buttonDisabled: {
     backgroundColor: '#4b5563',
@@ -174,15 +317,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  backButton: {
+  retryButton: {
     marginTop: 14,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
   },
-  backButtonText: {
+  retryButtonText: {
     color: '#84cc16',
     fontSize: 15,
     fontWeight: '600',
+  },
+  retryButtonTextDisabled: {
+    color: '#6b7280',
   },
 });

@@ -11,8 +11,7 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "gradleCommand": ":app:assembleRelease",
-        "applicationArchivePath": "android/app/build/outputs/apk/release/app-release.apk"
+        "buildType": "apk"
       }
     },
     "production": {

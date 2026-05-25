@@ -7,6 +7,7 @@ import {useQuery} from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { api } from '../api/client';
 
 const API_URL='https://motospotbackend-production.up.railway.app';
 export const BIKES_KEY = 'motospot_my_bikes_cache';
@@ -29,7 +30,7 @@ const fetchMyBikes = async (): Promise<Bike[]> => {
     throw new Error('No access token found');
   }
 
-  const res = await axios.get<Bike[]>(`${API_URL}/user/my-bikes`, {
+  const res = await api.get<Bike[]>(`${API_URL}/user/my-bikes`, {
     headers: { Authorization: `Bearer ${token}`},
   });
 

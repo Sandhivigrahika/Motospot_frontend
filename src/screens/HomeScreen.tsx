@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { api } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import AddressBar from '../components/AddressBar';
@@ -111,10 +112,13 @@ export default function HomeScreen({ navigation }: any) {
 
       const storedUser = await SecureStore.getItemAsync('user');
 
+
+      console.log("New user Loaded!")
+
       if (storedUser) {
         setUser(JSON.parse(storedUser));
 
-        const bikesRes = await axios.get(`${API_URL}/user/my-bikes`, {
+        const bikesRes = await api.get(`${API_URL}/user/my-bikes`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -122,21 +126,36 @@ export default function HomeScreen({ navigation }: any) {
         return;
       }
 
-      const bikesRes = await axios.get(`${API_URL}/user/my-bikes`, {
+      const bikesRes = await api.get(`${API_URL}/user/my-bikes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       setMyBikes(bikesRes.data || []);
 
-      const profileRes = await axios.get(`${API_URL}/dashboard/me/`, {
+      const profileRes = await api.get(`${API_URL}/dashboard/me/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const freshUser = profileRes.data;
       setUser(freshUser);
       await SecureStore.setItemAsync('user', JSON.stringify(freshUser));
-    } catch (err: any) {
-      console.error('Load error:', err.response?.data || err.message);
+    } catch (err: unknown)  {
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        const detail = err.response?.data?.detail;
+        
+        const isAuthError =
+        status === 401 ||
+        detail === 'Token expired' ||
+        detail === 'Could not validate credentials';
+
+
+        if (isAuthError) {
+          return;
+        }
+      }
+      console.error('Load error:' , axios.isAxiosError(err) ? err.response?.data ||
+    err.message: err);
       Alert.alert('Error', 'Failed to load your data. Pull to refresh or try again');
     } finally {
       setLoading(false);
@@ -255,7 +274,7 @@ export default function HomeScreen({ navigation }: any) {
           >
             <ImageBackground
               source={{
-                uri: 'https://drive.google.com/thumbnail?id=1nZI_1wJO1axyTcNbR-T2IApc3ZM0hN4B&sz=w1200'
+                uri: 'https://drive.google.com/uc?export=download&id=1bGv4Afg4DF4_yRi9i1vhQ2pqrZ4ePpLx'
               }}
               style={styles.bannerImage}
               imageStyle={styles.bannerImageStyle}
