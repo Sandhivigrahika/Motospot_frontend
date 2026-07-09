@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 export const api = axios.create({
     baseURL: 'https://motospotbackend-production.up.railway.app',
-    timeout: 15000,
+    timeout: 60000,
 });
 
 api.interceptors.request.use(

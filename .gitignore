@@ -36,4 +36,8 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+android/app/.cxx/
+android/.gradle/
+android/app/build/
+
 # generated native folderssss

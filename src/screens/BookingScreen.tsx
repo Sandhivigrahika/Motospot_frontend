@@ -22,6 +22,8 @@ import { PhoneCard } from '../components/PhoneCard';
 import { useMyBikes } from '../hooks/useMyBikes';
 import { useAddress } from '../hooks/useAddress';
 
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
+
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
 type ServiceItem = {
@@ -51,6 +53,8 @@ const BookingScreen = () => {
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [useManualAddress, setUseManualAddress] = useState(false);
   const [manualAddress, setManualAddress] = useState('');
+  const { getLocation, loading: locating, error: locError } = useCurrentLocation();
+  const [geocoding, setGeocoding] = useState(false);
   const [pincode, setPincode] = useState('');
   const [preferredDate, setPreferredDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -64,6 +68,9 @@ const BookingScreen = () => {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showConditionInfoModal, setShowConditionInfoModal] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [locationNotice, setLocationNotice] = useState<string | null> (null);
+
+
 
   useEffect(() => {
     if (route?.params?.serviceType || route?.params?.serviceRequested) {
@@ -137,6 +144,39 @@ const BookingScreen = () => {
         setIsRedirecting(false);
       }, 300);
     }, 150);
+  };
+
+  const handleFetchManualAddress = async () => {
+
+    setLocationNotice(null);
+
+    const coords = await getLocation();
+    if (!coords) {
+      if (locError) Alert.alert('Location', locError);
+      return;
+    }
+
+    setGeocoding(true);
+    try {
+      const token = await SecureStore.getItemAsync('accessToken');
+      const res = await api.post(
+        `${API_URL}/address/geocode/reverse`,
+        { latitude: coords.latitude, longitude: coords.longitude },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+      const geo = res.data;
+
+      if (geo.formatted_address) {
+        setManualAddress(geo.formatted_address);
+        setLocationNotice('📍 Address filled. Please review before booking.');
+      } else {
+        setLocationNotice('Got your location but couldn\'t resolve an address. Please type it manually.');
+      }
+    } catch (err) {
+      setLocationNotice('Couldn\'t fetch address from your location. Please type it manually.');
+    } finally {
+      setGeocoding(false);
+    }
   };
 
   const handleBook = async () => {
@@ -393,7 +433,8 @@ const BookingScreen = () => {
 
           <TouchableOpacity
             style={[styles.toggleBtn, useManualAddress && styles.toggleBtnActive]}
-            onPress={() => setUseManualAddress(true)}
+            //onPress={() => setUseManualAddress(true)}
+            onPress={() => { setUseManualAddress(true); setLocationNotice(null); }}
           >
             <Text style={[styles.toggleBtnText, useManualAddress && styles.toggleBtnTextActive]}>
               Enter Manually
@@ -402,13 +443,36 @@ const BookingScreen = () => {
         </View>
 
         {useManualAddress ? (
-          <TextInput
-            style={styles.textArea}
-            value={manualAddress}
-            onChangeText={setManualAddress}
-            placeholder="Enter full address"
-            multiline
-          />
+          <>
+            <TouchableOpacity
+              style={styles.locationBtn}
+              onPress={handleFetchManualAddress}
+              activeOpacity={0.85}
+              disabled={locating || geocoding}
+            >
+              {locating || geocoding ? (
+                <ActivityIndicator size="small" color="#10b981" />
+              ) : (
+                <Text style={styles.locationBtnText}>📍 Use my current location</Text>
+              )}
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.textArea}
+              value={manualAddress}
+              onChangeText={setManualAddress}
+              placeholder="Enter full address"
+              multiline
+            />
+
+            {locationNotice ? (
+              <Text style={styles.locationNotice}>{locationNotice}</Text>
+            ) : (
+              <Text style={styles.addressNote}>
+                ⚠️ Please check the address before confirming your booking.
+              </Text>
+            )}
+          </>
         ) : (
           <>
             <TouchableOpacity
@@ -757,6 +821,35 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  locationBtn: {
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#10b981',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+  },
+  locationBtnText: {
+    color: '#10b981',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  addressNote: {
+    fontSize: 12,
+    color: '#b45309',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+   locationNotice: {
+    fontSize: 13,
+    color: '#b45309',
+    backgroundColor: '#fffbeb',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 6,
   },
 });
 

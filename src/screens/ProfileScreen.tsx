@@ -150,31 +150,42 @@ export default function ProfileScreen() {
   };
 
   const savePhone = async () => {
-    if (!phoneInput.trim()) return;
-    setPhoneLoading(true);
-    try {
-      const headers = await getHeaders();
-      const res = await fetch(`${BASE}/user/phone`, {
-        method: user?.phone ? 'PUT' : 'POST',
-        headers,
-        body: JSON.stringify({ number: phoneInput.trim() }),
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        Alert.alert('Error', text || `Status ${res.status}`);
-        return;
+  if (!phoneInput.trim()) return;
+  setPhoneLoading(true);
+  try {
+    const headers = await getHeaders();
+    const res = await fetch(`${BASE}/user/phone`, {
+      method: user?.phone ? 'PUT' : 'POST',
+      headers,
+      body: JSON.stringify({ number: phoneInput.trim() }),
+    });
+
+    if (!res.ok) {
+      let message = `Something went wrong (status ${res.status})`;
+      try {
+        const data = await res.json();
+        if (data?.detail) message = data.detail;
+      } catch {
+        // response wasn't JSON — keep fallback
       }
-      const updated = { ...user, phone: phoneInput.trim() };
-      await SecureStore.setItemAsync('user', JSON.stringify(updated));
-      setUser(updated);
-      setPhoneModal(false);
-      Alert.alert('Success', 'Phone number updated!');
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to update phone number.');
-    } finally {
-      setPhoneLoading(false);
+      Alert.alert('Could not add phone', message);
+      return;
     }
-  };
+
+    const updated = { ...user, phone: phoneInput.trim() };
+    await SecureStore.setItemAsync('user', JSON.stringify(updated));
+    setUser(updated);
+    setPhoneModal(false);
+    Alert.alert('Success', 'Phone number updated!');
+  } catch (e: any) {
+    Alert.alert(
+      'Connection problem',
+      'Could not reach the server. It may be waking up — please try again in a moment.'
+    );
+  } finally {
+    setPhoneLoading(false);
+  }
+};
 
   const openEmailEdit = () => {
     setEmailInput(user?.email ?? '');

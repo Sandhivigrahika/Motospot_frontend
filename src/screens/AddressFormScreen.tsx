@@ -16,10 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { api } from '../api/client';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
 
 const ADDRESS_KEY = 'motospot_my_addresses_cache';
 const API_URL = 'https://motospotbackend-production.up.railway.app';
@@ -32,11 +32,22 @@ type FormState = {
   state: string;
   postal_code: string;
   country: string;
+  latitude: number | null;
+  longitude: number | null;
+  formatted_address: string | null;
 };
 
-type FieldKey = keyof FormState;
+// only the string-valued fields that render as TextInputs / chips
+type TextFieldKey =
+  | 'label'
+  | 'address_line'
+  | 'city'
+  | 'state'
+  | 'postal_code'
+  | 'country';
 
 export default function AddressFormScreen() {
+  const { getLocation, loading: locating, error: locError } = useCurrentLocation();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const queryClient = useQueryClient();
@@ -45,7 +56,11 @@ export default function AddressFormScreen() {
   const isEditing = !!existingAddress;
 
   const [loading, setLoading] = useState(false);
-  const inputRefs = useRef<Partial<Record<FieldKey, TextInput | null>>>({});
+  const [geocoding, setGeocoding] = useState(false);
+  const [locationNotice, setLocationNotice] = useState<string | null> (null);
+
+
+  const inputRefs = useRef<Partial<Record<TextFieldKey, TextInput | null>>>({});
 
   const [form, setForm] = useState<FormState>({
     label: existingAddress?.label ?? 'Home',
@@ -54,23 +69,69 @@ export default function AddressFormScreen() {
     state: existingAddress?.state ?? '',
     postal_code: existingAddress?.postal_code ?? '',
     country: existingAddress?.country ?? 'India',
+    latitude: existingAddress?.latitude ?? null,
+    longitude: existingAddress?.longitude ?? null,
+    formatted_address: existingAddress?.formatted_address ?? null,
   });
 
-  const update = useCallback((field: FieldKey, value: string) => {
+  const update = useCallback((field: TextFieldKey, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
   }, []);
 
   const getAuthHeaders = async () => {
     const token = await SecureStore.getItemAsync('accessToken');
-
     if (!token) {
       throw new Error('Missing access token');
     }
-
     return {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
+  };
+
+  // Tap "Use my current location" → get coords → reverse geocode → prefill fields
+  const handleUseLocation = async () => {
+    setLocationNotice(null);
+    const coords = await getLocation();
+    if (!coords) {
+      if (locError) Alert.alert('Location', locError);
+      return;
+    }
+
+    setGeocoding(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await api.post(
+        `${API_URL}/address/geocode/reverse`,
+        { latitude: coords.latitude, longitude: coords.longitude },
+        { headers }
+      );
+      const geo = res.data;
+
+      setForm(prev => ({
+        ...prev,
+        latitude: geo.latitude ?? coords.latitude,
+        longitude: geo.longitude ?? coords.longitude,
+        address_line: geo.address_line ?? prev.address_line,
+        city: geo.city ?? prev.city,
+        state: geo.state ?? prev.state,
+        postal_code: geo.postal_code ?? prev.postal_code,
+        country: geo.country ?? prev.country,
+        formatted_address: geo.formatted_address ?? null,
+      }));
+
+      setLocationNotice('📍 Address auto-filled. Please review before saving')
+    } catch (err) {
+      // Geocoding failed — keep raw coords so the pin still works; user types the rest
+      setForm(prev => ({
+        ...prev,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      }));
+      setLocationNotice('Could not fill the address. Retry or enter manually.');
+    } finally {
+      setGeocoding(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -122,42 +183,19 @@ export default function AddressFormScreen() {
   };
 
   const FIELDS: {
-    field: FieldKey;
+    field: TextFieldKey;
     placeholder: string;
     keyboardType: 'default' | 'numeric';
     autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters';
   }[] = [
-    {
-      field: 'address_line',
-      placeholder: 'Address Line *',
-      keyboardType: 'default',
-      autoCapitalize: 'words',
-    },
-    {
-      field: 'city',
-      placeholder: 'City *',
-      keyboardType: 'default',
-      autoCapitalize: 'words',
-    },
-    {
-      field: 'state',
-      placeholder: 'State *',
-      keyboardType: 'default',
-      autoCapitalize: 'words',
-    },
-    {
-      field: 'postal_code',
-      placeholder: 'Postal Code *',
-      keyboardType: 'numeric',
-      autoCapitalize: 'none',
-    },
-    {
-      field: 'country',
-      placeholder: 'Country',
-      keyboardType: 'default',
-      autoCapitalize: 'words',
-    },
+    { field: 'address_line', placeholder: 'Address Line *', keyboardType: 'default', autoCapitalize: 'words' },
+    { field: 'city', placeholder: 'City *', keyboardType: 'default', autoCapitalize: 'words' },
+    { field: 'state', placeholder: 'State *', keyboardType: 'default', autoCapitalize: 'words' },
+    { field: 'postal_code', placeholder: 'Postal Code *', keyboardType: 'numeric', autoCapitalize: 'none' },
+    { field: 'country', placeholder: 'Country', keyboardType: 'default', autoCapitalize: 'words' },
   ];
+
+  const locationBusy = locating || geocoding;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -190,6 +228,31 @@ export default function AddressFormScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <TouchableOpacity
+              style={styles.locationBtn}
+              onPress={handleUseLocation}
+              activeOpacity={0.85}
+              disabled={locationBusy}
+            >
+              {locationBusy ? (
+                <ActivityIndicator size="small" color="#16a34a" />
+              ) : (
+                <Text style={styles.locationBtnText}>📍 Use my current location</Text>
+              )}
+            </TouchableOpacity>
+
+            {locationNotice && (
+              <Text style={styles.locationNotice}> {locationNotice} </Text>
+            )}
+            {form.latitude != null && form.longitude != null && (
+            <Text style={styles.coordText}>
+              Location attached: {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
+            </Text>
+          )}
+
+
+            
 
             {FIELDS.map(({ field, placeholder, keyboardType, autoCapitalize }, index) => (
               <View key={field}>
@@ -246,13 +309,8 @@ export default function AddressFormScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-  },
+  flex: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: '#f3f4f6' },
   scrollContainer: {
     flexGrow: 1,
     padding: 16,
@@ -286,11 +344,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     marginBottom: 4,
   },
-  chipRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 4,
-  },
+  chipRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -299,18 +353,9 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
     backgroundColor: '#f9fafb',
   },
-  chipActive: {
-    backgroundColor: '#16a34a',
-    borderColor: '#16a34a',
-  },
-  chipText: {
-    fontSize: 13,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: '#fff',
-  },
+  chipActive: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
+  chipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  chipTextActive: { color: '#fff' },
   submitBtn: {
     marginTop: 20,
     backgroundColor: '#16a34a',
@@ -318,12 +363,28 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
   },
-  submitText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
+  submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  loadingSpinner: { marginTop: 24 },
+  locationBtn: {
+    marginTop: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#16a34a',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
   },
-  loadingSpinner: {
-    marginTop: 24,
-  },
+  locationBtnText: { color: '#16a34a', fontWeight: '600', fontSize: 14 },
+  coordText: { fontSize: 12, color: '#6b7280', marginTop: 4, marginBottom: 4 },
+  locationNotice: {
+  fontSize: 13,
+  color: '#b45309',      // amber — gentle caution, not error-red
+  backgroundColor: '#fffbeb',
+  borderRadius: 8,
+  paddingVertical: 8,
+  paddingHorizontal: 10,
+  marginTop: 8,
+  marginBottom: 4,
+},
 });

@@ -23,6 +23,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import BikeFormScreen from './src/screens/BikeFormScreen';
 import AddressFormScreen from './src/screens/AddressFormScreen';
 import AddressListScreen from './src/screens/AddressListScreen';
+import EmergencyScreen from './src/screens/EmergencyScreen';
 
 // Log to catch undefined imports immediately
 if (!HomeScreen) console.error('HomeScreen is undefined — check export/path');
@@ -125,6 +126,9 @@ function AppStack() {
 
       <Stack.Screen name="Profile" component={ProfileScreen} />
 
+      <Stack.Screen name="Emergency" component={EmergencyScreen} />
+
+      
       <Stack.Screen
         name="BikeForm"
         component={BikeFormScreen}

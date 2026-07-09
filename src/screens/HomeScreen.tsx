@@ -268,6 +268,32 @@ export default function HomeScreen({ navigation }: any) {
           }
         >
           <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.emergencyCard}
+            onPress={() => navigation.navigate('Emergency')}
+          >
+            <View style={styles.emergencyGlow} />
+            <View style={styles.emergencyContent}>
+              <View style={styles.emergencyLeft}>
+                <View style={styles.emergencyIconWrap}>
+                  <Ionicons name="warning" size={22} color="#FFFFFF" />
+                </View>
+
+                <View style={styles.emergencyTextBlock}>
+                  <Text style={styles.emergencyTitle}>Emergency Services</Text>
+                  <Text style={styles.emergencySubtitle}>
+                    Roadside help, urgent support, and quick access posters.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.emergencyArrow}>
+                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              </View>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
             activeOpacity={0.92}
             style={styles.bannerCard}
             onPress={() => handleServicePress(featuredPoster.serviceType)}
@@ -652,5 +678,83 @@ const styles = StyleSheet.create({
   elevation: 8,
   borderWidth: 1,
   borderColor: 'rgba(255,255,255,0.15)',
+  
 },
+   emergencyCard: {
+    marginBottom: 16,
+    borderRadius: 22,
+    backgroundColor: '#FF3B30',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+
+  emergencyGlow: {
+    position: 'absolute',
+    top: -24,
+    left: -10,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+
+  emergencyContent: {
+    minHeight: 82,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  emergencyLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 12,
+  },
+
+  emergencyIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+
+  emergencyTextBlock: {
+    flex: 1,
+  },
+
+  emergencyTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+
+  emergencySubtitle: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+
+  emergencyArrow: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

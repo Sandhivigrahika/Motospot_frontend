@@ -339,18 +339,24 @@ const BookingsListScreen = () => {
                     </TouchableOpacity>
                   )}
 
-                  {item.status === 'completed' && (
+                  {item.status === 'completed' &&  !submittedFeedback.has(item.id) && (
                     <TouchableOpacity
-                      style={styles.feedbackButton}
-                      onPress={() => {
-                        setFeedbackBookingId(item.id);
-                        setRating(0);
-                        setComment('');
-                        setfeedbackVisible(true);
-                      }}
-                      activeOpacity={0.9}
-                    >
-                      <Text style={styles.feedbackButtonText}>Rate Service</Text>
+                      disabled={submittedFeedback.has(item.id)}
+                      style={[
+                        styles.feedbackButton,
+                        submittedFeedback.has(item.id) && {
+                          opacity: 0.5 ,
+                        },
+                      ]}
+                      >
+                        <Text style={styles.feedbackButtonText}>
+                          {submittedFeedback.has(item.id)
+
+                         ? 'Feedback Submitted'
+                         : 'Rate Service'  
+
+                          }
+                        </Text>
                     </TouchableOpacity>
                   )}
                 </View>
