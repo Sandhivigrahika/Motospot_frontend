@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -18,6 +19,74 @@ import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
+/* ---------------- Toast ---------------- */
+
+type ToastType = 'error' | 'info';
+
+function Toast({
+  message,
+  type = 'error',
+  onHide,
+}: {
+  message: string;
+  type?: ToastType;
+  onHide: () => void;
+}) {
+  const translateY = useRef(new Animated.Value(-120)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  const hide = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -120,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) onHide();
+    });
+  }, [onHide, translateY, opacity]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    const timer = setTimeout(hide, 3500);
+    return () => clearTimeout(timer);
+  }, [hide, translateY, opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.toastContainer,
+        type === 'info' && styles.toastInfo,
+        { transform: [{ translateY }], opacity },
+      ]}
+    >
+      <TouchableOpacity activeOpacity={0.9} onPress={hide} style={styles.toastInner}>
+        <Text style={styles.toastText}>{message}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+/* ---------------- Screen ---------------- */
+
 export default function LoginScreen({ navigation }: any) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -25,19 +94,26 @@ export default function LoginScreen({ navigation }: any) {
 
   const [nameError, setNameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
-  const [apiError, setApiError] = useState('');
+
+  // transient toast (network / server / google errors)
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const { devSignIn } = useAuth();
   const { googleLogin, googleLoading } = useGoogleSignIn();
 
   const phoneInputRef = useRef<TextInput>(null);
 
+  const showToast = useCallback((message: string, type: ToastType = 'error') => {
+    // replace any existing toast
+    setToast(null);
+    requestAnimationFrame(() => setToast({ message, type }));
+  }, []);
+
   const validateForm = () => {
     let isValid = true;
 
     setNameError('');
     setPhoneError('');
-    setApiError('');
 
     if (name.trim().length < 2) {
       setNameError('Please enter at least 2 characters');
@@ -56,7 +132,6 @@ export default function LoginScreen({ navigation }: any) {
     if (!validateForm()) return;
 
     setLoading(true);
-    setApiError('');
 
     try {
       const res = await api.post(
@@ -94,19 +169,35 @@ export default function LoginScreen({ navigation }: any) {
           : null) ||
         'Failed to send OTP. Please try again.';
 
-      setApiError(serverMessage);
+      showToast(serverMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setApiError('');
-    await googleLogin();
+    
+    try {
+      await googleLogin();
+    } catch (error: any) {
+      const msg =
+        error?.message === 'Network request failed' || error?.message === 'Network Error'
+          ? 'Network error. Please check your internet connection.'
+          : 'Google sign-in failed. Please try again.';
+      showToast(msg);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
+
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAwareScrollView
           style={styles.flex}
@@ -136,7 +227,6 @@ export default function LoginScreen({ navigation }: any) {
                 onChangeText={(text) => {
                   setName(text);
                   if (nameError) setNameError('');
-                  if (apiError) setApiError('');
                 }}
                 autoCapitalize="words"
                 returnKeyType="next"
@@ -157,7 +247,6 @@ export default function LoginScreen({ navigation }: any) {
                   const cleaned = text.replace(/[^0-9]/g, '');
                   setPhone(cleaned);
                   if (phoneError) setPhoneError('');
-                  if (apiError) setApiError('');
                 }}
                 keyboardType="phone-pad"
                 maxLength={10}
@@ -166,12 +255,6 @@ export default function LoginScreen({ navigation }: any) {
               />
               {!!phoneError && (
                 <Text style={styles.fieldErrorText}>{phoneError}</Text>
-              )}
-
-              {!!apiError && (
-                <View style={styles.apiErrorBox}>
-                  <Text style={styles.apiErrorText}>{apiError}</Text>
-                </View>
               )}
 
               <TouchableOpacity
@@ -275,20 +358,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 4,
   },
-  apiErrorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.35)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 14,
-  },
-  apiErrorText: {
-    color: '#fca5a5',
-    fontSize: 14,
-    lineHeight: 20,
-  },
   button: {
     backgroundColor: '#9bf542',
     paddingVertical: 13,
@@ -356,5 +425,36 @@ const styles = StyleSheet.create({
     color: '#84cc16',
     fontSize: 15,
     fontWeight: '700',
+  },
+  /* toast */
+  toastContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 16,
+    right: 16,
+    zIndex: 999,
+    backgroundColor: '#7f1d1d',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.5)',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  toastInfo: {
+    backgroundColor: '#1e293b',
+    borderColor: 'rgba(148,163,184,0.4)',
+  },
+  toastInner: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  toastText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
   },
 });

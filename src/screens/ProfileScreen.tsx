@@ -145,46 +145,67 @@ export default function ProfileScreen() {
   };
 
   const openPhoneEdit = () => {
-    setPhoneInput(user?.phone ?? '');
-    setPhoneModal(true);
-  };
+  // Strip +91 so the input shows only the 10-digit number
+  const raw = (user?.phone ?? '').replace(/^\+91/, '');
+  setPhoneInput(raw);
+  setPhoneModal(true);
+};
 
-  const savePhone = async () => {
-  if (!phoneInput.trim()) return;
+const savePhone = async () => {
+  const number = phoneInput.trim();
+
+  // Validate: exactly 10 digits (backend adds +91)
+  if (!/^\d{10}$/.test(number)) {
+    Alert.alert('Invalid number', 'Please enter a valid 10-digit phone number.');
+    return;
+  }
+
   setPhoneLoading(true);
+
+  let res: Response;
   try {
     const headers = await getHeaders();
-    const res = await fetch(`${BASE}/user/phone`, {
+    res = await fetch(`${BASE}/user/phone`, {
       method: user?.phone ? 'PUT' : 'POST',
       headers,
-      body: JSON.stringify({ number: phoneInput.trim() }),
+      body: JSON.stringify({ number }),
     });
-
-    if (!res.ok) {
-      let message = `Something went wrong (status ${res.status})`;
-      try {
-        const data = await res.json();
-        if (data?.detail) message = data.detail;
-      } catch {
-        // response wasn't JSON — keep fallback
-      }
-      Alert.alert('Could not add phone', message);
-      return;
-    }
-
-    const updated = { ...user, phone: phoneInput.trim() };
-    await SecureStore.setItemAsync('user', JSON.stringify(updated));
-    setUser(updated);
-    setPhoneModal(false);
-    Alert.alert('Success', 'Phone number updated!');
   } catch (e: any) {
+    // Only a genuine network failure lands here
+    setPhoneLoading(false);
     Alert.alert(
       'Connection problem',
       'Could not reach the server. It may be waking up — please try again in a moment.'
     );
-  } finally {
-    setPhoneLoading(false);
+    return;
   }
+
+  // We got a response — handle success vs error explicitly
+  if (!res.ok) {
+    let message = `Something went wrong (status ${res.status})`;
+    try {
+      const data = await res.json();
+      if (data?.detail) message = data.detail;
+    } catch {
+      // not JSON — keep fallback
+    }
+    setPhoneLoading(false);
+    Alert.alert('Could not add phone', message);
+    return;
+  }
+
+  // Success (2xx) — update local state; guard post-processing separately
+  try {
+    const updated = { ...user, phone: `+91${number}` };
+    await SecureStore.setItemAsync('user', JSON.stringify(updated));
+    setUser(updated);
+  } catch {
+    // even if caching fails, the phone WAS saved on the server
+  }
+
+  setPhoneLoading(false);
+  setPhoneModal(false);
+  Alert.alert('Success', 'Phone number updated!');
 };
 
   const openEmailEdit = () => {

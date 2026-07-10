@@ -1,6 +1,6 @@
 // src/screens/BookingListScreen.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
@@ -83,7 +84,7 @@ const COLORS = {
   shadow: '#000000',
 };
 
-// ✅ FIXED: manual date parsing avoids UTC midnight → IST day-shift bug
+// ✅ manual date parsing avoids UTC midnight → IST day-shift bug
 const formatDateTime = (dateStr: string, timeStr: string): string => {
   const [year, month, day] = dateStr.split('-').map(Number);
   const date = new Date(year, month - 1, day);
@@ -104,6 +105,7 @@ const formatDateTime = (dateStr: string, timeStr: string): string => {
 const BookingsListScreen = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [feedbackVisible, setfeedbackVisible] = useState(false);
   const [feedbackBookingId, setFeedbackBookingId] = useState<string | null>(null);
@@ -111,68 +113,98 @@ const BookingsListScreen = () => {
   const [comment, setComment] = useState<string>('');
   const [submittedFeedback, setsubmittedFeedback] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    loadBookings();
-  }, []);
+  const loadBookings = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    try {
+      const token = await SecureStore.getItemAsync('accessToken');
 
-  const loadBookings = async () => {
-  try {
-    const token = await SecureStore.getItemAsync('accessToken');
+      const response = await api.get('/bookings/me?status=active', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    const response = await api.get('/bookings/me?status=active', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      setBookings(response.data);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const detail = error.response?.data?.detail;
 
-    setBookings(response.data);
-  } catch (error: unknown) {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      const detail = error.response?.data?.detail;
+        const isAuthError =
+          status === 401 ||
+          detail === 'Token expired' ||
+          detail === 'Could not validate credentials';
 
-      const isAuthError =
-        status === 401 ||
-        detail === 'Token expired' ||
-        detail === 'Could not validate credentials';
-
-      if (isAuthError) {
-        return;
+        if (isAuthError) {
+          return;
+        }
       }
-    }
 
-    console.log('Bookings load error:', error);
-    Alert.alert('Error', 'Failed to load bookings');
-  } finally {
-    setLoading(false);
-  }
-};
+      console.log('Bookings load error:', error);
+      Alert.alert('Error', 'Failed to load bookings');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Refetch every time the screen comes into focus (after booking, cancelling, etc.)
+  useFocusEffect(
+    useCallback(() => {
+      loadBookings();
+    }, [])
+  );
 
   const handleCancel = async (bookingId: string) => {
-    Alert.alert(
-      'Cancel Booking',
-      'Are you sure you want to cancel this booking?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
+  Alert.alert(
+    'Cancel Booking',
+    'Are you sure you want to cancel this booking?',
+    [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, Cancel',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const token = await SecureStore.getItemAsync('accessToken');
+            await api.post(
+              `${API_URL}/bookings/${bookingId}/cancel`,
+              {},
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            Alert.alert('Done', 'Booking cancelled successfully');
+            loadBookings();
+          } catch (error: any) {
+            // The request threw — but the cancel may have succeeded server-side.
+            // Re-fetch and check the actual state before deciding what to show.
             try {
               const token = await SecureStore.getItemAsync('accessToken');
-              await api.post(
-                `${API_URL}/bookings/${bookingId}/cancel`,
-                {},
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-              Alert.alert('Done', 'Booking cancelled successfully');
+              const res = await api.get('/bookings/me?status=active', {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const stillActive = res.data.some((b: Booking) => b.id === bookingId);
+              setBookings(res.data);
+
+              if (!stillActive) {
+                // It's gone from the active list → cancel actually worked
+                Alert.alert('Done', 'Booking cancelled successfully');
+              } else {
+                // Genuinely still active → real failure
+                const detail = error?.response?.data?.detail;
+                Alert.alert('Error', detail || 'Could not cancel booking. Please try again.');
+              }
+            } catch {
+              // Couldn't even re-check (network still down) — refresh and stay quiet-ish
               loadBookings();
-            } catch (error) {
-              Alert.alert('Error', 'Could not cancel booking. Try again.');
+              Alert.alert(
+                'Check your connection',
+                'We could not confirm the cancellation. Please refresh in a moment.'
+              );
             }
-          },
+          }
         },
-      ]
-    );
-  };
+      },
+    ]
+  );
+};
 
   const submitFeedback = async () => {
     if (!feedbackBookingId) return;
@@ -295,8 +327,8 @@ const BookingsListScreen = () => {
             <FlatList
               data={bookings}
               keyExtractor={(item) => item.id}
-              refreshing={loading}
-              onRefresh={loadBookings}
+              refreshing={refreshing}
+              onRefresh={() => loadBookings(true)}
               ListEmptyComponent={renderEmptyState}
               renderItem={({ item }) => (
                 <View style={styles.bookingCard}>
@@ -339,24 +371,19 @@ const BookingsListScreen = () => {
                     </TouchableOpacity>
                   )}
 
-                  {item.status === 'completed' &&  !submittedFeedback.has(item.id) && (
+                  {item.status === 'completed' && !submittedFeedback.has(item.id) && (
                     <TouchableOpacity
                       disabled={submittedFeedback.has(item.id)}
                       style={[
                         styles.feedbackButton,
                         submittedFeedback.has(item.id) && {
-                          opacity: 0.5 ,
+                          opacity: 0.5,
                         },
                       ]}
-                      >
-                        <Text style={styles.feedbackButtonText}>
-                          {submittedFeedback.has(item.id)
-
-                         ? 'Feedback Submitted'
-                         : 'Rate Service'  
-
-                          }
-                        </Text>
+                    >
+                      <Text style={styles.feedbackButtonText}>
+                        {submittedFeedback.has(item.id) ? 'Feedback Submitted' : 'Rate Service'}
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </View>

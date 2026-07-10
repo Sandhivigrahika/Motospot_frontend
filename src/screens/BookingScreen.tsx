@@ -222,32 +222,63 @@ const BookingScreen = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+
+
       if (response.status === 201 || response.status === 200) {
         Alert.alert('Success', 'Booking Created');
         navigation.navigate('Bookings');
       } else {
         Alert.alert('Success', 'Booking created!');
       }
-    }  catch (error: unknown) {
-  if (axios.isAxiosError(error)) {
+    }  catch (error: any) {
+
+      // Auth error: ;et the interceptor handle logout, stay silent here
+      if (axios.isAxiosError(error)) {
     const status = error.response?.status;
     const detail = error.response?.data?.detail;
 
-    if (status === 401 || detail === 'Token expired' || detail === 'Could not validate credentials') {
+      if (status === 401 || detail === 'Token expired' || detail === 'Could not validate credentials') {
       return;
     }
-
-    Alert.alert('Error', String(detail || 'Booking Failed'));
-  } else if (error instanceof Error) {
-    Alert.alert('Error', error.message);
-  } else {
-    Alert.alert('Error', 'Booking Failed');
   }
+      //Request threw - the booking may still have been created (cold_start timeout).
+      //verify by refetching and looking for matching booking
+      try {
+      const token = await SecureStore.getItemAsync('accessToken');
+      const res = await api.get('/bookings/me?status=active', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    } finally {
-      setLoading(false);
-    }
-  };
+      const created = res.data.some(
+        (b: any) =>
+          b.bike_id === selectedBike &&
+          b.status !== 'cancelled' &&
+          b.status !== 'rejected'
+      );
+
+      if (created) {
+        //It actuall went through
+        Alert.alert('Success', 'Booking created successfully!');
+        navigation.navigate('Bookings');
+      } else {
+        const detail = error?.response?.data?.detail;
+        Alert.alert(
+          'Booking failed',
+          String(detail || error?.message || 'Could not create booking. Please try again.')
+        );
+      }
+
+    } catch {
+      // Couldn't even re-check (network still down)
+      Alert.alert(
+        'Check your connection',
+        'We could not confirm your booking. Please check the Bookings tab in a moment.'
+      );
+    } 
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
