@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   RefreshControl,
   StatusBar,
   ImageBackground,
+  FlatList,
+  Dimensions,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
@@ -19,9 +21,14 @@ import { useAuth } from '../context/AuthContext';
 import AddressBar from '../components/AddressBar';
 import { useAddress } from '../hooks/useAddress';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import  SupportRequestModal  from '../components/SupportRequestModal';
+import SupportRequestModal from '../components/SupportRequestModal';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
+
+const { width } = Dimensions.get('window');
+const BANNER_WIDTH = width - 36;
+const BANNER_GAP = 12;
+const BANNER_STRIDE = BANNER_WIDTH + BANNER_GAP;
 
 const COLORS = {
   bg: '#050505',
@@ -46,13 +53,19 @@ const COLORS = {
   shadow: '#000000',
 };
 
-const featuredPoster = {
-  id: 'hero-1',
-  title: '',
-  subtitle: 'Bike service made easy',
-  cta: 'Book Now',
-  serviceType: 'Bike Wash',
+type Poster = {
+  id: string;
+  image: number | string;
+  serviceType: string;
 };
+
+const posters: Poster[] = [
+  { id: 'p1', image: require('../../assets/posters/p1.webp'), serviceType: 'Emergency Services' },
+  { id: 'p2', image: require('../../assets/posters/p2.webp'), serviceType: 'General Service' },
+  { id: 'p3', image: require('../../assets/posters/p3.webp'), serviceType: 'Dent & Paint' },
+  { id: 'p4', image: require('../../assets/posters/p4.webp'), serviceType: 'Bike Wash' },
+  { id: 'p5', image: require('../../assets/posters/p5.webp'), serviceType: 'General Service' },
+];
 
 const services = [
   {
@@ -89,7 +102,10 @@ export default function HomeScreen({ navigation }: any) {
   const [user, setUser] = useState<{ name: string; phone: string } | null>(null);
   const [myBikes, setMyBikes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [supportVisible, setSupportVisible] = useState(false)
+  const [supportVisible, setSupportVisible] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const posterListRef = useRef<FlatList<Poster>>(null);
 
   const { signOut, devSignIn, isAuthenticated } = useAuth();
   const {
@@ -112,8 +128,7 @@ export default function HomeScreen({ navigation }: any) {
 
       const storedUser = await SecureStore.getItemAsync('user');
 
-
-      console.log("New user Loaded!")
+      console.log('New user Loaded!');
 
       if (storedUser) {
         setUser(JSON.parse(storedUser));
@@ -139,23 +154,24 @@ export default function HomeScreen({ navigation }: any) {
       const freshUser = profileRes.data;
       setUser(freshUser);
       await SecureStore.setItemAsync('user', JSON.stringify(freshUser));
-    } catch (err: unknown)  {
+    } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status;
         const detail = err.response?.data?.detail;
-        
-        const isAuthError =
-        status === 401 ||
-        detail === 'Token expired' ||
-        detail === 'Could not validate credentials';
 
+        const isAuthError =
+          status === 401 ||
+          detail === 'Token expired' ||
+          detail === 'Could not validate credentials';
 
         if (isAuthError) {
           return;
         }
       }
-      console.error('Load error:' , axios.isAxiosError(err) ? err.response?.data ||
-    err.message: err);
+      console.error(
+        'Load error:',
+        axios.isAxiosError(err) ? err.response?.data || err.message : err
+      );
       Alert.alert('Error', 'Failed to load your data. Pull to refresh or try again');
     } finally {
       setLoading(false);
@@ -177,9 +193,41 @@ export default function HomeScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation, isAuthenticated]);
 
+  // Auto-advance carousel
+  useEffect(() => {
+    if (posters.length < 2) return;
+
+    const timer = setInterval(() => {
+      setActiveIndex((prev) => {
+        const next = (prev + 1) % posters.length;
+        posterListRef.current?.scrollToIndex({ index: next, animated: true });
+        return next;
+      });
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   const handleServicePress = (serviceType: string) => {
     navigation.navigate('Book', { serviceType });
   };
+
+  const renderPoster = ({ item }: { item: Poster }) => (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      style={[styles.bannerCard, { width: BANNER_WIDTH }]}
+      onPress={() => handleServicePress(item.serviceType)}
+    >
+      <ImageBackground
+        source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+        style={styles.bannerImage}
+        imageStyle={styles.bannerImageStyle}
+        resizeMode="cover"
+      >
+        <View style={styles.bannerOverlay} />
+      </ImageBackground>
+    </TouchableOpacity>
+  );
 
   const renderService = (service: any) => (
     <TouchableOpacity
@@ -292,37 +340,49 @@ export default function HomeScreen({ navigation }: any) {
               </View>
             </View>
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            activeOpacity={0.92}
-            style={styles.bannerCard}
-            onPress={() => handleServicePress(featuredPoster.serviceType)}
-          >
-            <ImageBackground
-              source={{
-                uri: 'https://drive.google.com/uc?export=download&id=1bGv4Afg4DF4_yRi9i1vhQ2pqrZ4ePpLx'
-              }}
-              style={styles.bannerImage}
-              imageStyle={styles.bannerImageStyle}
-              resizeMode="cover"
-            >
-              <View style={styles.bannerOverlay} />
-              <View style={styles.bannerBottomFade} />
 
-              <View style={styles.bannerContent}>
-                <Text style={styles.bannerTitle}>{featuredPoster.title}</Text>
-              </View>
-            </ImageBackground>
-          </TouchableOpacity>
+          {/* Poster carousel */}
+          <View style={styles.carouselWrap}>
+            <FlatList
+              ref={posterListRef}
+              data={posters}
+              keyExtractor={(item) => item.id}
+              renderItem={renderPoster}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={BANNER_STRIDE}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              ItemSeparatorComponent={() => <View style={{ width: BANNER_GAP }} />}
+              getItemLayout={(_, index) => ({
+                length: BANNER_STRIDE,
+                offset: BANNER_STRIDE * index,
+                index,
+              })}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_STRIDE);
+                setActiveIndex(idx);
+              }}
+              initialNumToRender={2}
+              windowSize={5}
+            />
+
+            <View style={styles.dotsRow}>
+              {posters.map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, i === activeIndex && styles.dotActive]}
+                />
+              ))}
+            </View>
+          </View>
 
           <View style={styles.welcomeBlock}>
             <Text style={styles.welcomeTitle}>Welcome, {user.name}!</Text>
             <Text style={styles.welcomeSubtitle}>Select a service to continue....</Text>
           </View>
 
-          <View style={styles.servicesGrid}>
-            {services.map(renderService)}
-          </View>
+          <View style={styles.servicesGrid}>{services.map(renderService)}</View>
 
           {!hasBikes && (
             <View style={styles.quickActionsCard}>
@@ -367,6 +427,7 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           )}
         </ScrollView>
+
         <TouchableOpacity
           style={styles.supportFab}
           activeOpacity={0.88}
@@ -467,13 +528,35 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
   },
+
+  // Carousel
+  carouselWrap: {
+    marginBottom: 16,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.border,
+  },
+  dotActive: {
+    width: 18,
+    backgroundColor: COLORS.primary,
+  },
+
   bannerCard: {
     borderRadius: 26,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
-    marginBottom: 16,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.34,
@@ -489,27 +572,9 @@ const styles = StyleSheet.create({
   },
   bannerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    backgroundColor: 'rgba(0,0,0,0.10)',
   },
-  bannerBottomFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 120,
-    backgroundColor: 'rgba(0,0,0,0.48)',
-  },
-  bannerContent: {
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-  },
-  bannerTitle: {
-    color: COLORS.text,
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 28,
-    maxWidth: '92%',
-  },
+
   welcomeBlock: {
     marginBottom: 16,
     paddingHorizontal: 2,
@@ -662,25 +727,24 @@ const styles = StyleSheet.create({
     color: COLORS.dangerText,
   },
   supportFab: {
-  position: 'absolute',
-  right: 18,
-  bottom: 88,
-  width: 54,
-  height: 54,
-  borderRadius: 27,
-  backgroundColor: COLORS.primary,
-  alignItems: 'center',
-  justifyContent: 'center',
-  shadowColor: COLORS.shadow,
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.28,
-  shadowRadius: 14,
-  elevation: 8,
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.15)',
-  
-},
-   emergencyCard: {
+    position: 'absolute',
+    right: 18,
+    bottom: 88,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  emergencyCard: {
     marginBottom: 16,
     borderRadius: 22,
     backgroundColor: '#FF3B30',
@@ -693,7 +757,6 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 12,
   },
-
   emergencyGlow: {
     position: 'absolute',
     top: -24,
@@ -703,7 +766,6 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
-
   emergencyContent: {
     minHeight: 82,
     paddingHorizontal: 16,
@@ -712,14 +774,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-
   emergencyLeft: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingRight: 12,
   },
-
   emergencyIconWrap: {
     width: 48,
     height: 48,
@@ -731,24 +791,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
   },
-
   emergencyTextBlock: {
     flex: 1,
   },
-
   emergencyTitle: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 4,
   },
-
   emergencySubtitle: {
     color: 'rgba(255,255,255,0.88)',
     fontSize: 13,
     lineHeight: 18,
   },
-
   emergencyArrow: {
     width: 38,
     height: 38,

@@ -69,6 +69,8 @@ const BookingScreen = () => {
   const [showConditionInfoModal, setShowConditionInfoModal] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [locationNotice, setLocationNotice] = useState<string | null> (null);
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [pincodeNotice, setPincodeNotice] = useState<string | null> (null);
 
 
 
@@ -146,6 +148,42 @@ const BookingScreen = () => {
     }, 150);
   };
 
+  const handleFetchPincode = async() => {
+    setPincodeNotice(null);
+    
+    const coords = await getLocation();
+    if(!coords) {
+      if (locError) setPincodeNotice(locError);
+      return;
+    }
+
+    setPincodeLoading(true);
+    try {
+      const token = await SecureStore.getItemAsync('accessToken');
+      const res = await api.post(
+        `${API_URL}/address/geocode/reverse/pincode`,
+        { latitude: coords.latitude, longitude: coords.longitude },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+    );
+      // handles either { pincode: "..." }, { postal_code: "..." }, or a bare string
+    const fetched = res.data?.pincode ?? res.data?.postal_code ?? res.data;
+  
+    if (fetched) {
+      setPincode(String(fetched));
+      setPincodeNotice('📍 Pincode filled from your location.')
+    } else {
+      setPincodeNotice('Could not find a pincode for your location. Please enter it manually.');
+    }
+
+  } catch (err: any)
+ {
+  const detail = err?.response?.data?.detail;
+  setPincode(detail || 'Could not fetch pincode. Please enter manually.')
+ } finally {
+  setPincodeLoading(false);
+ }
+
+  };
   const handleFetchManualAddress = async () => {
 
     setLocationNotice(null);
@@ -391,6 +429,20 @@ const BookingScreen = () => {
         </Modal>
 
         <Text style={styles.label}>Pincode</Text>
+
+        <TouchableOpacity
+          style={styles.locationBtn}
+          onPress={handleFetchPincode}
+          activeOpacity={0.85}
+          disabled={locating || pincodeLoading}
+        >
+          {locating || pincodeLoading ? (
+            <ActivityIndicator size="small" color="#10b981" />
+          ) : (
+            <Text style={styles.locationBtnText}>📍 Use my current location</Text>
+          )}
+        </TouchableOpacity>
+
         <TextInput
           style={styles.input}
           value={pincode}
@@ -398,6 +450,10 @@ const BookingScreen = () => {
           placeholder="e.g. 560001"
           keyboardType="numeric"
         />
+
+        {pincodeNotice && (
+          <Text style={styles.locationNotice}>{pincodeNotice}</Text>
+        )}
 
         <Text style={styles.label}>Add or Update phone</Text>
         <PhoneCard />

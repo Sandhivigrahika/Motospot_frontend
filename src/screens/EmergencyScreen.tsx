@@ -7,9 +7,12 @@ import {
   ScrollView,
   StatusBar,
   Linking,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
 
 const COLORS = {
   bg: '#050505',
@@ -35,6 +38,8 @@ const COLORS = {
 
 // Helpline number — change to your real emergency line.
 const HELPLINE = '+917903499148';
+// WhatsApp target for location shares (country code + number, no '+' or spaces)
+const ADMIN_WHATSAPP = '917903499148';
 
 type EmergencyService = {
   id: number;
@@ -72,8 +77,52 @@ export default function EmergencyScreen({ navigation }: any) {
   const [activeKey, setActiveKey] = useState(SECTIONS[0].key);
   const active = SECTIONS.find((s) => s.key === activeKey) ?? SECTIONS[0];
 
+  const { getLocation, loading: locating, error: locError } = useCurrentLocation();
+
+  // Opens WhatsApp with a pre-filled emergency message containing a map link
+  const handleShareLocation = async () => {
+    const coords = await getLocation();
+    if (!coords) {
+      Alert.alert(
+        'Location needed',
+        locError || 'Please enable location so we can find you.'
+      );
+      return;
+    }
+
+    const mapsLink = `https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`;
+
+    const message =
+      `🚨 *EMERGENCY — MotoSpot*\n\n` +
+      `*Vehicle:* ${active.title}\n` +
+      `*My location:* ${mapsLink}\n\n` +
+      `Please send help.`;
+
+    const appUrl = `whatsapp://send?phone=${ADMIN_WHATSAPP}&text=${encodeURIComponent(message)}`;
+    const webUrl = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(message)}`;
+
+    try {
+      const supported = await Linking.canOpenURL(appUrl);
+      await Linking.openURL(supported ? appUrl : webUrl);
+    } catch {
+      Alert.alert('WhatsApp unavailable', 'Please call the helpline instead.');
+    }
+  };
+
+  // Calls the helpline, then prompts to share location when the user returns
   const handleCall = () => {
     Linking.openURL(`tel:${HELPLINE.replace(/\s+/g, '')}`);
+
+    setTimeout(() => {
+      Alert.alert(
+        'Share your location?',
+        'Sending your location helps us reach you faster.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Share on WhatsApp', onPress: handleShareLocation },
+        ]
+      );
+    }, 1500);
   };
 
   return (
@@ -106,10 +155,12 @@ export default function EmergencyScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Reassurance note, directly below banner */}
+        {/* Reassurance note */}
         <View style={styles.note}>
           <Ionicons name="information-circle-outline" size={16} color={COLORS.textMuted} />
-          <Text style={styles.noteText}>Prices may vary based on location</Text>
+          <Text style={styles.noteText}>
+            Tap any service to call · Prices may vary by location
+          </Text>
         </View>
 
         {/* Vehicle toggle */}
@@ -128,9 +179,7 @@ export default function EmergencyScreen({ navigation }: any) {
                   size={16}
                   color={isActive ? COLORS.danger : COLORS.textMuted}
                 />
-                <Text
-                  style={[styles.toggleText, isActive && styles.toggleTextActive]}
-                >
+                <Text style={[styles.toggleText, isActive && styles.toggleTextActive]}>
                   {section.title}
                 </Text>
               </TouchableOpacity>
@@ -138,14 +187,19 @@ export default function EmergencyScreen({ navigation }: any) {
           })}
         </View>
 
-        {/* Scrollable service list */}
+        {/* Scrollable service list — each row calls the helpline */}
         <ScrollView
           style={styles.listArea}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         >
           {active.services.map((service) => (
-            <View key={service.id} style={styles.row}>
+            <TouchableOpacity
+              key={service.id}
+              style={styles.row}
+              onPress={handleCall}
+              activeOpacity={0.7}
+            >
               <View style={styles.rowIndex}>
                 <Text style={styles.rowIndexText}>{service.id}</Text>
               </View>
@@ -155,13 +209,19 @@ export default function EmergencyScreen({ navigation }: any) {
               </View>
               <View style={styles.rowPriceWrap}>
                 <Text style={styles.rowPrice}>{service.price}</Text>
+                <Ionicons
+                  name="call-outline"
+                  size={14}
+                  color={COLORS.textMuted}
+                  style={{ marginTop: 4 }}
+                />
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      {/* Sticky call button */}
+      {/* Sticky footer: call + share location */}
       <View style={styles.footer}>
         <TouchableOpacity
           activeOpacity={0.9}
@@ -171,6 +231,23 @@ export default function EmergencyScreen({ navigation }: any) {
           <Ionicons name="call" size={20} color="#FFFFFF" />
           <Text style={styles.callButtonText}>Call Emergency Helpline</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.shareLocationButton}
+          onPress={handleShareLocation}
+          disabled={locating}
+        >
+          {locating ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <>
+              <Ionicons name="location" size={18} color={COLORS.primary} />
+              <Text style={styles.shareLocationText}>Share My Location</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
         <Text style={styles.callSub}>{HELPLINE}</Text>
       </View>
     </SafeAreaView>
@@ -273,6 +350,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderSoft,
   },
   noteText: {
+    flex: 1,
     color: COLORS.textMuted,
     fontSize: 13,
     fontStyle: 'italic',
@@ -388,6 +466,23 @@ const styles = StyleSheet.create({
   callButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '800',
+  },
+  shareLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 50,
+    borderRadius: 16,
+    marginTop: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  shareLocationText: {
+    color: COLORS.primary,
+    fontSize: 15,
     fontWeight: '800',
   },
   callSub: {
