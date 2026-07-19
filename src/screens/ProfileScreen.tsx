@@ -21,6 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
 const BASE = 'https://motospotbackend-production.up.railway.app';
@@ -145,68 +146,68 @@ export default function ProfileScreen() {
   };
 
   const openPhoneEdit = () => {
-  // Strip +91 so the input shows only the 10-digit number
-  const raw = (user?.phone ?? '').replace(/^\+91/, '');
-  setPhoneInput(raw);
-  setPhoneModal(true);
-};
+    // Strip +91 so the input shows only the 10-digit number
+    const raw = (user?.phone ?? '').replace(/^\+91/, '');
+    setPhoneInput(raw);
+    setPhoneModal(true);
+  };
 
-const savePhone = async () => {
-  const number = phoneInput.trim();
+  const savePhone = async () => {
+    const number = phoneInput.trim();
 
-  // Validate: exactly 10 digits (backend adds +91)
-  if (!/^\d{10}$/.test(number)) {
-    Alert.alert('Invalid number', 'Please enter a valid 10-digit phone number.');
-    return;
-  }
-
-  setPhoneLoading(true);
-
-  let res: Response;
-  try {
-    const headers = await getHeaders();
-    res = await fetch(`${BASE}/user/phone`, {
-      method: user?.phone ? 'PUT' : 'POST',
-      headers,
-      body: JSON.stringify({ number }),
-    });
-  } catch (e: any) {
-    // Only a genuine network failure lands here
-    setPhoneLoading(false);
-    Alert.alert(
-      'Connection problem',
-      'Could not reach the server. It may be waking up — please try again in a moment.'
-    );
-    return;
-  }
-
-  // We got a response — handle success vs error explicitly
-  if (!res.ok) {
-    let message = `Something went wrong (status ${res.status})`;
-    try {
-      const data = await res.json();
-      if (data?.detail) message = data.detail;
-    } catch {
-      // not JSON — keep fallback
+    // Validate: exactly 10 digits (backend adds +91)
+    if (!/^\d{10}$/.test(number)) {
+      Alert.alert('Invalid number', 'Please enter a valid 10-digit phone number.');
+      return;
     }
+
+    setPhoneLoading(true);
+
+    let res: Response;
+    try {
+      const headers = await getHeaders();
+      res = await fetch(`${BASE}/user/phone`, {
+        method: user?.phone ? 'PUT' : 'POST',
+        headers,
+        body: JSON.stringify({ number }),
+      });
+    } catch (e: any) {
+      // Only a genuine network failure lands here
+      setPhoneLoading(false);
+      Alert.alert(
+        'Connection problem',
+        'Could not reach the server. It may be waking up — please try again in a moment.'
+      );
+      return;
+    }
+
+    // We got a response — handle success vs error explicitly
+    if (!res.ok) {
+      let message = `Something went wrong (status ${res.status})`;
+      try {
+        const data = await res.json();
+        if (data?.detail) message = data.detail;
+      } catch {
+        // not JSON — keep fallback
+      }
+      setPhoneLoading(false);
+      Alert.alert('Could not add phone', message);
+      return;
+    }
+
+    // Success (2xx) — update local state; guard post-processing separately
+    try {
+      const updated = { ...user, phone: `+91${number}` };
+      await SecureStore.setItemAsync('user', JSON.stringify(updated));
+      setUser(updated);
+    } catch {
+      // even if caching fails, the phone WAS saved on the server
+    }
+
     setPhoneLoading(false);
-    Alert.alert('Could not add phone', message);
-    return;
-  }
-
-  // Success (2xx) — update local state; guard post-processing separately
-  try {
-    const updated = { ...user, phone: `+91${number}` };
-    await SecureStore.setItemAsync('user', JSON.stringify(updated));
-    setUser(updated);
-  } catch {
-    // even if caching fails, the phone WAS saved on the server
-  }
-
-  setPhoneLoading(false);
-  setPhoneModal(false);
-  Alert.alert('Success', 'Phone number updated!');
-};
+    setPhoneModal(false);
+    Alert.alert('Success', 'Phone number updated!');
+  };
 
   const openEmailEdit = () => {
     setEmailInput(user?.email ?? '');
@@ -214,39 +215,52 @@ const savePhone = async () => {
   };
 
   const saveEmail = async () => {
-    const email = emailInput.trim();
-    if (!email) return;
-    setEmailLoading(true);
+  const email = emailInput.trim();
+  if (!email) return;
+  setEmailLoading(true);
+
+  let res: Response;
+  try {
+    const headers = await getHeaders();
+    res = await fetch(`${BASE}/user/email`, {
+      method: user?.email ? 'PUT' : 'POST',
+      headers,
+      body: JSON.stringify({ email }),
+    });
+  } catch (e: any) {
+    setEmailLoading(false);
+    Alert.alert(
+      'Connection problem',
+      'Could not reach the server. It may be waking up — please try again in a moment.'
+    );
+    return;
+  }
+
+  if (!res.ok) {
+    let message = `Something went wrong (status ${res.status})`;
     try {
-      const headers = await getHeaders();
-      let res = await fetch(`${BASE}/user/email`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ email }),
-      });
-
-      if (res.status === 404 || res.status === 422 || res.status === 400) {
-        res = await fetch(`${BASE}/user/email`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ email }),
-        });
-      }
-
-      const text = await res.text();
-      if (!res.ok) throw new Error(text || `Status ${res.status}`);
-
-      const updated = { ...user, email };
-      await SecureStore.setItemAsync('user', JSON.stringify(updated));
-      setUser(updated);
-      setEmailModal(false);
-      Alert.alert('Success', 'Email updated!');
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to update email.');
-    } finally {
-      setEmailLoading(false);
+      const data = await res.json();
+      if (data?.detail) message = data.detail;
+    } catch {
+      // response wasn't JSON — keep the fallback message
     }
-  };
+    setEmailLoading(false);
+    Alert.alert('Could not update email', message);
+    return;
+  }
+
+  try {
+    const updated = { ...user, email };
+    await SecureStore.setItemAsync('user', JSON.stringify(updated));
+    setUser(updated);
+  } catch {
+    // even if caching fails, the email WAS saved on the server
+  }
+
+  setEmailLoading(false);
+  setEmailModal(false);
+  Alert.alert('Success', 'Email updated!');
+};
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -322,17 +336,21 @@ const savePhone = async () => {
                   {user?.phone ?? 'No phone added'}
                 </Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.fieldRow} onPress={openEmailEdit} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={[styles.fieldRow, styles.rowLast]}
+              onPress={openEmailEdit}
+              activeOpacity={0.85}
+            >
               <View style={styles.fieldLeft}>
                 <Text style={styles.fieldLabel}>Email</Text>
                 <Text style={[styles.fieldValue, !user?.email && styles.emptyValue]}>
                   {user?.email ?? 'No email added'}
                 </Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
 
@@ -349,10 +367,10 @@ const savePhone = async () => {
             ) : bikes.length === 0 ? (
               <Text style={styles.emptyItalic}>No bikes added</Text>
             ) : (
-              bikes.map((bike: any) => (
+              bikes.map((bike: any, i: number) => (
                 <TouchableOpacity
                   key={bike.id}
-                  style={styles.itemRow}
+                  style={[styles.itemRow, i === bikes.length - 1 && styles.rowLast]}
                   onPress={() => navigation.navigate('BikeForm', { bike })}
                   activeOpacity={0.8}
                 >
@@ -364,7 +382,7 @@ const savePhone = async () => {
                       {bike.registration_number} · {bike.purchase_year}
                     </Text>
                   </View>
-                  <Text style={styles.rowChevron}>›</Text>
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
                 </TouchableOpacity>
               ))
             )}
@@ -383,10 +401,10 @@ const savePhone = async () => {
             ) : addresses.length === 0 ? (
               <Text style={styles.emptyItalic}>No addresses added</Text>
             ) : (
-              addresses.map((addr: any) => (
+              addresses.map((addr: any, i: number) => (
                 <TouchableOpacity
                   key={addr.id}
-                  style={styles.itemRow}
+                  style={[styles.itemRow, i === addresses.length - 1 && styles.rowLast]}
                   onPress={() => navigation.navigate('AddressForm', { address: addr })}
                   activeOpacity={0.8}
                 >
@@ -398,7 +416,7 @@ const savePhone = async () => {
                       {addr.address_line}, {addr.city}
                     </Text>
                   </View>
-                  <Text style={styles.rowChevron}>›</Text>
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
                 </TouchableOpacity>
               ))
             )}
@@ -413,28 +431,28 @@ const savePhone = async () => {
               activeOpacity={0.85}
             >
               <View style={styles.supportIcon}>
-                <Text style={styles.supportEmoji}>📞</Text>
+                <Ionicons name="call" size={18} color={COLORS.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportLabel}>Phone</Text>
                 <Text style={styles.supportValue}>+91 79034 99148</Text>
               </View>
-              <Text style={styles.rowChevron}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.supportRow}
+              style={[styles.supportRow, styles.rowLast]}
               onPress={() => Linking.openURL('mailto:support@motospot.in')}
               activeOpacity={0.85}
             >
               <View style={styles.supportIcon}>
-                <Text style={styles.supportEmoji}>📧</Text>
+                <Ionicons name="mail" size={18} color={COLORS.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportLabel}>Email</Text>
                 <Text style={styles.supportValue}>support@motospot.in</Text>
               </View>
-              <Text style={styles.rowChevron}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
 
@@ -705,10 +723,9 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontWeight: '500',
   },
-  chevron: {
-    fontSize: 24,
-    color: COLORS.primary,
-    fontWeight: '700',
+  // Removes the trailing divider on the last row of any section
+  rowLast: {
+    borderBottomWidth: 0,
   },
   loader: {
     marginVertical: 10,
@@ -739,11 +756,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 4,
   },
-  rowChevron: {
-    fontSize: 24,
-    color: COLORS.primary,
-    fontWeight: '700',
-  },
   supportRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -761,9 +773,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
-  },
-  supportEmoji: {
-    fontSize: 18,
   },
   supportText: {
     flex: 1,

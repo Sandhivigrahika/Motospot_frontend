@@ -22,7 +22,7 @@ import AddressBar from '../components/AddressBar';
 import { useAddress } from '../hooks/useAddress';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SupportRequestModal from '../components/SupportRequestModal';
-
+import { LinearGradient } from 'expo-linear-gradient';
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
 const { width } = Dimensions.get('window');
@@ -244,7 +244,7 @@ export default function HomeScreen({ navigation }: any) {
       </View>
 
       <View style={styles.serviceIconWrap}>
-        <Ionicons name={service.icon as any} size={34} color={COLORS.textSecondary} />
+        <Ionicons name={service.icon as any} size={30} color={COLORS.primary} />
       </View>
     </TouchableOpacity>
   );
@@ -292,12 +292,9 @@ export default function HomeScreen({ navigation }: any) {
               />
             </View>
 
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.profileButton}
-              onPress={() => navigation.navigate('Profile')}
-            >
-              <Text style={styles.profileIcon}>👤</Text>
+            <TouchableOpacity activeOpacity={0.85} style={styles.profileButton}
+              onPress={() => navigation.navigate('Profile')}>
+              <Ionicons name="person" size={22} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -321,7 +318,12 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Emergency')}
           >
             <View style={styles.emergencyGlow} />
-            <View style={styles.emergencyContent}>
+            <LinearGradient
+              colors={['#FF5A5F', '#FF3B30', '#D32118']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emergencyContent}
+            >
               <View style={styles.emergencyLeft}>
                 <View style={styles.emergencyIconWrap}>
                   <Ionicons name="warning" size={22} color="#FFFFFF" />
@@ -338,7 +340,7 @@ export default function HomeScreen({ navigation }: any) {
               <View style={styles.emergencyArrow}>
                 <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
               </View>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
 
           {/* Poster carousel */}
@@ -473,11 +475,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surfaceElevated,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.primarySoft,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.28,
@@ -564,8 +566,9 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   bannerImage: {
-    height: 255,
-    justifyContent: 'flex-end',
+  width: '100%',
+  aspectRatio: 3 / 2,      // was: height: 255
+  justifyContent: 'flex-end',
   },
   bannerImageStyle: {
     borderRadius: 26,
@@ -641,11 +644,11 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.primarySoft,   // ba(255,255,255,0.04)
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(166,244,0,0.22)',                // 'rgba(255,255,255,0.08)',
   },
   quickActionsCard: {
     backgroundColor: COLORS.surface,
