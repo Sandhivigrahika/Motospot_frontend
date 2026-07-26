@@ -212,7 +212,7 @@ export default function LoginScreen({ navigation }: any) {
           <View style={styles.container}>
             <View style={styles.logoSection}>
               <Image
-                source={require('../../assets/motospot_logo.png')}
+                source={require('../../assets/motospot_logo_2.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />

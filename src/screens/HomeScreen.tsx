@@ -109,7 +109,7 @@ export default function HomeScreen({ navigation }: any) {
 
   const { signOut, devSignIn, isAuthenticated } = useAuth();
   const {
-    latestAddress,
+    selectedAddress,
     isLoading: loadingAddresses,
     refetch: refetchAddresses,
   } = useAddress();
@@ -286,9 +286,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.headerRow}>
             <View style={styles.addressContainer}>
               <AddressBar
-                address={latestAddress}
-                loading={loadingAddresses}
-                onPress={() => navigation.navigate('AddressList')}
+                onPress={() => navigation.navigate('AddressForm')}
               />
             </View>
 

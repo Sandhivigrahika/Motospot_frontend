@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -170,7 +171,7 @@ const BookingScreen = () => {
   
     if (fetched) {
       setPincode(String(fetched));
-      setPincodeNotice('📍 Pincode filled from your location.')
+      setPincodeNotice(' Pincode filled from your location.')
     } else {
       setPincodeNotice('Could not find a pincode for your location. Please enter it manually.');
     }
@@ -206,7 +207,7 @@ const BookingScreen = () => {
 
       if (geo.formatted_address) {
         setManualAddress(geo.formatted_address);
-        setLocationNotice('📍 Address filled. Please review before booking.');
+        setLocationNotice('Address filled. Please review before booking.');
       } else {
         setLocationNotice('Got your location but couldn\'t resolve an address. Please type it manually.');
       }
@@ -319,93 +320,261 @@ const BookingScreen = () => {
 };
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={styles.title}>Book Service</Text>
+    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.label}>Service Type</Text>
-        <TouchableOpacity style={styles.dropdown} onPress={() => setShowServiceModal(true)}>
-          <Text style={styles.dropdownText}>
-            {serviceRequested || 'Tap to select service'}
-          </Text>
-          <Text style={styles.dropdownArrow}>▼</Text>
-        </TouchableOpacity>
+        {/* ── DARK HEADER (hero) ── */}
+        <SafeAreaView edges={['top']} style={styles.header}>
+          <View style={styles.brandRow}>
+            <Image source={require('../../assets/posters/logo-mark.png')} style={styles.brandMark} />
+            <Text style={styles.brandName}>MOTOSPOT</Text>
+          </View>
+          <Text style={styles.headerTitle}>Let's get your bike sorted</Text>
+          <Text style={styles.headerSub}>Book a service in under a minute.</Text>
+        </SafeAreaView>
 
+        {/* ── LIGHT FORM (overlaps header) ── */}
+        <View style={styles.sheet}>
+
+          {/* Service area */}
+          <View style={styles.areaCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.areaLabel}>Service area</Text>
+              <TextInput
+                style={styles.areaInput}
+                value={pincode}
+                onChangeText={setPincode}
+                placeholder="Enter pincode"
+                placeholderTextColor="#94a3b8"
+                keyboardType="numeric"
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.locatePill}
+              onPress={handleFetchPincode}
+              activeOpacity={0.85}
+              disabled={locating || pincodeLoading}
+            >
+              {locating || pincodeLoading ? (
+                <ActivityIndicator size="small" color="#10b981" />
+              ) : (
+                <>
+                  <Ionicons name="location-sharp" size={15} color="#10b981" />
+                  <Text style={styles.locateText}>Locate</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          {pincodeNotice && <Text style={styles.notice}>{pincodeNotice}</Text>}
+
+          {/* What */}
+          <Text style={styles.groupLabel}>What do you need?</Text>
+          <TouchableOpacity style={styles.row} onPress={() => setShowServiceModal(true)} activeOpacity={0.7}>
+            <View style={styles.rowLeft}>
+              <View style={styles.rowIcon}><Ionicons name="construct-outline" size={18} color="#475569" /></View>
+              <Text style={serviceRequested ? styles.rowText : styles.rowPlaceholder}>
+                {serviceRequested || 'Choose a service'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color="#cbd5e1" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => { if (!isRedirecting) setShowBikeModal(true); }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.rowLeft}>
+              <View style={styles.rowIcon}><Ionicons name="bicycle-outline" size={18} color="#475569" /></View>
+              <Text style={selectedBike ? styles.rowText : styles.rowPlaceholder}>{selectedBikeName}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color="#cbd5e1" />
+          </TouchableOpacity>
+
+          {/* When */}
+          <Text style={styles.groupLabel}>When works for you?</Text>
+          <TouchableOpacity style={styles.row} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+            <View style={styles.rowLeft}>
+              <View style={styles.rowIcon}><Ionicons name="calendar-outline" size={18} color="#475569" /></View>
+              <Text style={styles.rowText}>{formatDate(preferredDate)}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={preferredDate}
+              mode="date"
+              display="default"
+              minimumDate={new Date()}
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) setPreferredDate(new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
+              }}
+            />
+          )}
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 7, paddingVertical: 4 }}>
+              {TIME_SLOTS.map((slot) => (
+                <TouchableOpacity
+                  key={slot}
+                  onPress={() => setSelectedTime(slot)}
+                  style={[styles.slot, selectedTime === slot && styles.slotActive]}
+                >
+                  <Text style={[styles.slotText, selectedTime === slot && styles.slotTextActive]}>{slot}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* Where */}
+          <Text style={styles.groupLabel}>Where should we come?</Text>
+          <View style={styles.seg}>
+            <TouchableOpacity
+              style={[styles.segBtn, !useManualAddress && styles.segBtnActive]}
+              onPress={() => setUseManualAddress(false)}
+            >
+              <Text style={[styles.segText, !useManualAddress && styles.segTextActive]}>Saved</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.segBtn, useManualAddress && styles.segBtnActive]}
+              onPress={() => { setUseManualAddress(true); setLocationNotice(null); }}
+            >
+              <Text style={[styles.segText, useManualAddress && styles.segTextActive]}>Manual</Text>
+            </TouchableOpacity>
+          </View>
+
+          {useManualAddress ? (
+            <>
+              <TouchableOpacity
+                style={[styles.locatePill, { alignSelf: 'flex-start', marginTop: 10 }]}
+                onPress={handleFetchManualAddress}
+                activeOpacity={0.85}
+                disabled={locating || geocoding}
+              >
+                {locating || geocoding ? (
+                  <ActivityIndicator size="small" color="#10b981" />
+                ) : (
+                  <>
+                    <Ionicons name="location-sharp" size={15} color="#10b981" />
+                    <Text style={styles.locateText}>Use my location</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TextInput
+                style={[styles.textArea, { marginTop: 8 }]}
+                value={manualAddress}
+                onChangeText={setManualAddress}
+                placeholder="Enter full address"
+                placeholderTextColor="#94a3b8"
+                multiline
+              />
+              {locationNotice ? (
+                <Text style={styles.notice}>{locationNotice}</Text>
+              ) : (
+                <Text style={styles.hint}>We'll confirm the address before we ride out.</Text>
+              )}
+            </>
+          ) : (
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => { if (!isRedirecting) setShowAddressModal(true); }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.rowLeft}>
+                <View style={styles.rowIcon}><Ionicons name="home-outline" size={18} color="#475569" /></View>
+                <Text style={selectedAddressId ? styles.rowText : styles.rowPlaceholder}>{selectedAddressName}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={17} color="#cbd5e1" />
+            </TouchableOpacity>
+          )}
+
+          {/* Condition */}
+          <View style={styles.groupRow}>
+            <Text style={styles.groupLabel}>How's the bike right now?</Text>
+            <TouchableOpacity onPress={() => setShowConditionInfoModal(true)} activeOpacity={0.7}>
+              <Ionicons name="information-circle-outline" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.seg}>
+            <TouchableOpacity
+              style={[styles.segBtn, currentCondition === 'running condition' && styles.segBtnActive]}
+              onPress={() => setCurrentCondition('running condition')}
+            >
+              <View style={styles.segIconRow}>
+                <Ionicons name="checkmark-circle" size={17} color={currentCondition === 'running condition' ? '#fff' : '#10b981'} />
+                <Text style={[styles.segText, currentCondition === 'running condition' && styles.segTextActive]}>Running</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.segBtn, currentCondition === 'dead condition' && styles.segBtnActive]}
+              onPress={() => setCurrentCondition('dead condition')}
+            >
+              <View style={styles.segIconRow}>
+                <Ionicons name="alert-circle" size={17} color={currentCondition === 'dead condition' ? '#fff' : '#ef4444'} />
+                <Text style={[styles.segText, currentCondition === 'dead condition' && styles.segTextActive]}>Dead</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Notes */}
+          <TextInput
+            style={[styles.textArea, { marginTop: 12 }]}
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Anything we should know? (optional)"
+            placeholderTextColor="#94a3b8"
+            multiline
+          />
+
+          {/* Phone */}
+          <Text style={styles.groupLabel}>Contact number</Text>
+          <PhoneCard />
+
+          <TouchableOpacity style={styles.cta} onPress={handleBook} disabled={loading} activeOpacity={0.9}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Confirm booking</Text>}
+          </TouchableOpacity>
+        </View>
+
+        {/* ── MODALS (logic unchanged) ── */}
         <Modal visible={showServiceModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Select Service</Text>
-
-              {servicesLoading ? (
-                <ActivityIndicator style={{ paddingVertical: 24 }} />
-              ) : (
+              <Text style={styles.modalTitle}>Choose a service</Text>
+              {servicesLoading ? <ActivityIndicator style={{ paddingVertical: 24 }} /> : (
                 <FlatList
                   data={services}
                   keyExtractor={(item, index) => `${item.name}-${index}`}
                   renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={[
-                        styles.modalItem,
-                        serviceRequested === item.name && styles.modalItemActive,
-                      ]}
-                      onPress={() => {
-                        setServiceRequested(item.name);
-                        setShowServiceModal(false);
-                      }}
+                      style={[styles.modalItem, serviceRequested === item.name && styles.modalItemActive]}
+                      onPress={() => { setServiceRequested(item.name); setShowServiceModal(false); }}
                     >
                       <Text style={styles.modalItemText}>{item.name}</Text>
                     </TouchableOpacity>
                   )}
-                  ListEmptyComponent={
-                    <View style={styles.emptyState}>
-                      <Text style={styles.emptyText}>No services available right now.</Text>
-                    </View>
-                  }
+                  ListEmptyComponent={<View style={styles.emptyState}><Text style={styles.emptyText}>No services available right now.</Text></View>}
                 />
               )}
-
-              <TouchableOpacity
-                style={styles.modalClose}
-                onPress={() => setShowServiceModal(false)}
-              >
+              <TouchableOpacity style={styles.modalClose} onPress={() => setShowServiceModal(false)}>
                 <Text style={styles.modalCloseText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
         </Modal>
 
-        <Text style={styles.label}>Select Bike</Text>
-        <TouchableOpacity
-          style={styles.dropdown}
-          onPress={() => {
-            if (!isRedirecting) setShowBikeModal(true);
-          }}
-        >
-          <Text style={styles.dropdownText}>{selectedBikeName}</Text>
-          <Text style={styles.dropdownArrow}>▼</Text>
-        </TouchableOpacity>
-
         <Modal visible={showBikeModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Select Bike</Text>
-
-              {bikesLoading ? (
-                <ActivityIndicator style={{ paddingVertical: 24 }} />
-              ) : (
+              <Text style={styles.modalTitle}>Choose a bike</Text>
+              {bikesLoading ? <ActivityIndicator style={{ paddingVertical: 24 }} /> : (
                 <FlatList
                   data={bikes}
                   keyExtractor={(item: any) => item.id.toString()}
                   renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={[
-                        styles.modalItem,
-                        selectedBike === String(item.id) && styles.modalItemActive,
-                      ]}
-                      onPress={() => {
-                        setSelectedBike(String(item.id));
-                        setShowBikeModal(false);
-                      }}
+                      style={[styles.modalItem, selectedBike === String(item.id) && styles.modalItemActive]}
+                      onPress={() => { setSelectedBike(String(item.id)); setShowBikeModal(false); }}
                     >
                       <Text style={styles.modalItemText}>{item.registration_number}</Text>
                     </TouchableOpacity>
@@ -414,13 +583,12 @@ const BookingScreen = () => {
                     <View style={styles.emptyState}>
                       <Text style={styles.emptyText}>No bikes added yet.</Text>
                       <TouchableOpacity style={styles.addNewButton} onPress={handleAddNewBike}>
-                        <Text style={styles.addNewButtonText}>Add New Bike</Text>
+                        <Text style={styles.addNewButtonText}>Add a bike</Text>
                       </TouchableOpacity>
                     </View>
                   }
                 />
               )}
-
               <TouchableOpacity style={styles.modalClose} onPress={() => setShowBikeModal(false)}>
                 <Text style={styles.modalCloseText}>Cancel</Text>
               </TouchableOpacity>
@@ -428,516 +596,141 @@ const BookingScreen = () => {
           </View>
         </Modal>
 
-        <Text style={styles.label}>Pincode</Text>
-
-        <TouchableOpacity
-          style={styles.locationBtn}
-          onPress={handleFetchPincode}
-          activeOpacity={0.85}
-          disabled={locating || pincodeLoading}
-        >
-          {locating || pincodeLoading ? (
-            <ActivityIndicator size="small" color="#10b981" />
-          ) : (
-            <Text style={styles.locationBtnText}>📍 Use my current location</Text>
-          )}
-        </TouchableOpacity>
-
-        <TextInput
-          style={styles.input}
-          value={pincode}
-          onChangeText={setPincode}
-          placeholder="e.g. 560001"
-          keyboardType="numeric"
-        />
-
-        {pincodeNotice && (
-          <Text style={styles.locationNotice}>{pincodeNotice}</Text>
-        )}
-
-        <Text style={styles.label}>Add or Update phone</Text>
-        <PhoneCard />
-
-        <Text style={styles.label}>Date & Time</Text>
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={[styles.dropdown, { flex: 1, marginRight: 8 }]}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.dropdownText}>{formatDate(preferredDate)}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {showDatePicker && (
-  <DateTimePicker
-    value={preferredDate}
-    mode="date"
-    display="default"
-    minimumDate={new Date()}
-    onChange={(_, date) => {
-      setShowDatePicker(false);
-      if (date) {
-        setPreferredDate(
-          new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0)
-        );
-      }
-    }}
-  />
-)}
-
-        <Text style={styles.label}>Select Time</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-          <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
-            {TIME_SLOTS.map((slot) => (
-              <TouchableOpacity
-                key={slot}
-                onPress={() => setSelectedTime(slot)}
-                style={[styles.timeSlot, selectedTime === slot && styles.timeSlotActive]}
-              >
-                <Text
-                  style={[
-                    styles.timeSlotText,
-                    selectedTime === slot && styles.timeSlotTextActive,
-                  ]}
-                >
-                  {slot}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        <Text style={styles.label}>Address</Text>
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, !useManualAddress && styles.toggleBtnActive]}
-            onPress={() => setUseManualAddress(false)}
-          >
-            <Text style={[styles.toggleBtnText, !useManualAddress && styles.toggleBtnTextActive]}>
-              Choose Address
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.toggleBtn, useManualAddress && styles.toggleBtnActive]}
-            //onPress={() => setUseManualAddress(true)}
-            onPress={() => { setUseManualAddress(true); setLocationNotice(null); }}
-          >
-            <Text style={[styles.toggleBtnText, useManualAddress && styles.toggleBtnTextActive]}>
-              Enter Manually
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {useManualAddress ? (
-          <>
-            <TouchableOpacity
-              style={styles.locationBtn}
-              onPress={handleFetchManualAddress}
-              activeOpacity={0.85}
-              disabled={locating || geocoding}
-            >
-              {locating || geocoding ? (
-                <ActivityIndicator size="small" color="#10b981" />
-              ) : (
-                <Text style={styles.locationBtnText}>📍 Use my current location</Text>
-              )}
-            </TouchableOpacity>
-
-            <TextInput
-              style={styles.textArea}
-              value={manualAddress}
-              onChangeText={setManualAddress}
-              placeholder="Enter full address"
-              multiline
-            />
-
-            {locationNotice ? (
-              <Text style={styles.locationNotice}>{locationNotice}</Text>
-            ) : (
-              <Text style={styles.addressNote}>
-                ⚠️ Please check the address before confirming your booking.
-              </Text>
-            )}
-          </>
-        ) : (
-          <>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => {
-                if (!isRedirecting) setShowAddressModal(true);
-              }}
-            >
-              <Text style={styles.dropdownText}>{selectedAddressName}</Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </TouchableOpacity>
-
-            <Modal visible={showAddressModal} transparent animationType="slide">
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalBox}>
-                  <Text style={styles.modalTitle}>Select Address</Text>
-
-                  {addressesLoading ? (
-                    <ActivityIndicator style={{ paddingVertical: 24 }} />
-                  ) : (
-                    <FlatList
-                      data={addresses}
-                      keyExtractor={(item: any) => item.id.toString()}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={[
-                            styles.modalItem,
-                            selectedAddressId === String(item.id) && styles.modalItemActive,
-                          ]}
-                          onPress={() => {
-                            setSelectedAddressId(String(item.id));
-                            setShowAddressModal(false);
-                          }}
-                        >
-                          <Text style={styles.modalItemText}>
-                            {item.label || item.address_line}
-                          </Text>
-                          {item.label ? (
-                            <Text style={styles.modalItemSub}>{item.address_line}</Text>
-                          ) : null}
-                        </TouchableOpacity>
-                      )}
-                      ListEmptyComponent={
-                        <View style={styles.emptyState}>
-                          <Text style={styles.emptyText}>No addresses saved yet.</Text>
-                          <TouchableOpacity
-                            style={styles.addNewButton}
-                            onPress={handleAddNewAddress}
-                          >
-                            <Text style={styles.addNewButtonText}>Add New Address</Text>
-                          </TouchableOpacity>
-                        </View>
-                      }
-                    />
+        <Modal visible={showAddressModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Choose an address</Text>
+              {addressesLoading ? <ActivityIndicator style={{ paddingVertical: 24 }} /> : (
+                <FlatList
+                  data={addresses}
+                  keyExtractor={(item: any) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[styles.modalItem, selectedAddressId === String(item.id) && styles.modalItemActive]}
+                      onPress={() => { setSelectedAddressId(String(item.id)); setShowAddressModal(false); }}
+                    >
+                      <Text style={styles.modalItemText}>{item.label || item.address_line}</Text>
+                      {item.label ? <Text style={styles.modalItemSub}>{item.address_line}</Text> : null}
+                    </TouchableOpacity>
                   )}
-
-                  <TouchableOpacity
-                    style={styles.modalClose}
-                    onPress={() => setShowAddressModal(false)}
-                  >
-                    <Text style={styles.modalCloseText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Modal>
-          </>
-        )}
-
-        <View style={styles.labelRow}>
-          <Text style={styles.label}>Bike Condition</Text>
-          <TouchableOpacity
-            onPress={() => setShowConditionInfoModal(true)}
-            style={styles.infoButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="information-circle-outline" size={18} color="#64748b" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.toggleBtn,
-              currentCondition === 'running condition' && styles.toggleBtnActive,
-            ]}
-            onPress={() => setCurrentCondition('running condition')}
-          >
-            <Text
-              style={[
-                styles.toggleBtnText,
-                currentCondition === 'running condition' && styles.toggleBtnTextActive,
-              ]}
-            >
-              🟢 Running
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.toggleBtn,
-              currentCondition === 'dead condition' && styles.toggleBtnActive,
-            ]}
-            onPress={() => setCurrentCondition('dead condition')}
-          >
-            <Text
-              style={[
-                styles.toggleBtnText,
-                currentCondition === 'dead condition' && styles.toggleBtnTextActive,
-              ]}
-            >
-              🔴 Dead
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Modal visible={showConditionInfoModal} transparent animationType="fade">
-          <View style={styles.infoModalOverlay}>
-            <View style={styles.infoModalBox}>
-              <Text style={styles.infoModalTitle}>Bike Condition Info</Text>
-
-              <Text style={styles.infoModalText}>
-                <Text style={{ fontWeight: '700', color: '#1e293b' }}>Running condition:</Text>{' '}
-                The bike starts and can move on its own, even if it has some issue or needs service.
-              </Text>
-
-              <Text style={[styles.infoModalText, { marginTop: 10 }]}>
-                <Text style={{ fontWeight: '700', color: '#1e293b' }}>Dead condition:</Text>{' '}
-                The bike does not start, cannot move on its own, or may need pickup/support to be
-                serviced.
-              </Text>
-
-              <TouchableOpacity
-                style={styles.infoModalCloseButton}
-                onPress={() => setShowConditionInfoModal(false)}
-              >
-                <Text style={styles.infoModalCloseText}>Got it</Text>
+                  ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyText}>No addresses saved yet.</Text>
+                      <TouchableOpacity style={styles.addNewButton} onPress={handleAddNewAddress}>
+                        <Text style={styles.addNewButtonText}>Add an address</Text>
+                      </TouchableOpacity>
+                    </View>
+                  }
+                />
+              )}
+              <TouchableOpacity style={styles.modalClose} onPress={() => setShowAddressModal(false)}>
+                <Text style={styles.modalCloseText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
         </Modal>
 
-        <Text style={styles.label}>Notes (optional)</Text>
-        <TextInput
-          style={styles.textArea}
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Any additional notes"
-          multiline
-        />
-
-        <TouchableOpacity style={styles.bookButton} onPress={handleBook} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.bookButtonText}>Book Service</Text>
-          )}
-        </TouchableOpacity>
+        <Modal visible={showConditionInfoModal} transparent animationType="fade">
+          <View style={styles.infoModalOverlay}>
+            <View style={styles.infoModalBox}>
+              <Text style={styles.infoModalTitle}>Bike condition</Text>
+              <Text style={styles.infoModalText}>
+                <Text style={{ fontWeight: '700', color: '#1e293b' }}>Running:</Text> The bike starts and moves on its own, even if it needs service.
+              </Text>
+              <Text style={[styles.infoModalText, { marginTop: 10 }]}>
+                <Text style={{ fontWeight: '700', color: '#1e293b' }}>Dead:</Text> The bike won't start or move, and may need pickup.
+              </Text>
+              <TouchableOpacity style={styles.infoModalCloseButton} onPress={() => setShowConditionInfoModal(false)}>
+                <Text style={styles.infoModalCloseText}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 20 },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 24,
-    textAlign: 'center',
-    color: '#1e293b',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-    marginTop: 16,
-    marginBottom: 6,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 6,
-  },
-  infoButton: {
-    marginLeft: 6,
-    padding: 2,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 12,
-    borderRadius: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    elevation: 1,
-  },
-  textArea: {
-    height: 80,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 12,
-    borderRadius: 10,
-    textAlignVertical: 'top',
-    fontSize: 15,
-    backgroundColor: '#fff',
-    elevation: 1,
-  },
-  row: { flexDirection: 'row' },
-  dropdown: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    elevation: 1,
-  },
-  dropdownText: { fontSize: 15, color: '#1e293b' },
-  dropdownArrow: { fontSize: 12, color: '#94a3b8' },
-  toggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    padding: 4,
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  toggleBtnActive: { backgroundColor: '#3b82f6' },
-  toggleBtnText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  toggleBtnTextActive: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  bookButton: {
-    backgroundColor: '#10b981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  bookButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  modalBox: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '60%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  modalItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 6,
+  safe: { flex: 1, backgroundColor: '#0D0F10' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+
+  header: { backgroundColor: '#0D0F10', paddingHorizontal: 20, paddingTop: 2, paddingBottom: 18 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 25 },
+  brandMark: { width: 35, height: 35, resizeMode: 'contain' },
+  brandName: { fontSize: 12, color: '#8B948C', letterSpacing: 1 },
+  headerTitle: { fontSize: 20, fontWeight: '600', color: '#F5F7F2', lineHeight: 28, marginBottom: 5 },
+  headerSub: { fontSize: 13, color: '#8B948C' },
+
+  sheet: {
     backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    marginTop: -16, paddingHorizontal: 18, paddingTop: 22, paddingBottom: 10,
   },
-  modalItemActive: { backgroundColor: '#dbeafe' },
+
+  areaCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#e8ecf1',
+    borderRadius: 14, padding: 14,
+  },
+  areaLabel: { fontSize: 12, color: '#94a3b8', marginBottom: 2 },
+  areaInput: { fontSize: 17, fontWeight: '500', color: '#1e293b', padding: 0 },
+  locatePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ecfdf5', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12 },
+  locateText: { fontSize: 13, color: '#10b981', fontWeight: '600' },
+
+  groupLabel: { fontSize: 13, fontWeight: '500', color: '#64748b', marginTop: 20, marginBottom: 8, marginLeft: 4 },
+  groupRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, marginBottom: 8, marginLeft: 4 },
+
+  row: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#e8ecf1',
+    borderRadius: 14, padding: 14, marginBottom: 8,
+  },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  rowIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  rowText: { fontSize: 15, color: '#1e293b' },
+  rowPlaceholder: { fontSize: 15, color: '#94a3b8' },
+
+  slot: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 0.5, borderColor: '#e8ecf1', backgroundColor: '#fff' },
+  slotActive: { backgroundColor: '#0D0F10', borderColor: '#0D0F10' },
+  slotText: { fontSize: 13, fontWeight: '500', color: '#475569' },
+  slotTextActive: { color: '#fff' },
+
+  seg: { flexDirection: 'row', backgroundColor: '#eef1f5', borderRadius: 12, padding: 4, gap: 4 },
+  segBtn: { flex: 1, paddingVertical: 11, borderRadius: 9, alignItems: 'center' },
+  segBtnActive: { backgroundColor: '#0D0F10' },
+  segIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  segText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  segTextActive: { color: '#fff' },
+
+  textArea: { minHeight: 72, borderWidth: 0.5, borderColor: '#e8ecf1', padding: 14, borderRadius: 14, textAlignVertical: 'top', fontSize: 15, backgroundColor: '#fff', color: '#1e293b' },
+
+  cta: { backgroundColor: '#0D0F10', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
+  ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+
+  notice: { fontSize: 13, color: '#b45309', backgroundColor: '#fffbeb', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10, marginTop: 8 },
+  hint: { fontSize: 12, color: '#94a3b8', marginTop: 8, marginLeft: 4 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalBox: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '60%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b', marginBottom: 16 },
+  modalItem: { paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, marginBottom: 6, backgroundColor: '#f8fafc' },
+  modalItemActive: { backgroundColor: '#d1fae5' },
   modalItemText: { fontSize: 16, color: '#1e293b', fontWeight: '500' },
   modalItemSub: { fontSize: 13, color: '#94a3b8', marginTop: 2 },
-  modalClose: {
-    marginTop: 12,
-    padding: 14,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
+  modalClose: { marginTop: 12, padding: 14, backgroundColor: '#f1f5f9', borderRadius: 10, alignItems: 'center' },
   modalCloseText: { fontSize: 15, fontWeight: '600', color: '#64748b' },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#94a3b8',
-    fontSize: 15,
-  },
-  addNewButton: {
-    marginTop: 12,
-    backgroundColor: '#3b82f6',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-  },
-  addNewButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  timeSlot: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#fff',
-  },
-  timeSlotActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
-  timeSlotText: { fontSize: 14, fontWeight: '500', color: '#1e293b' },
-  timeSlotTextActive: { color: '#fff' },
-  infoModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  infoModalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-  },
-  infoModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 12,
-  },
-  infoModalText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#475569',
-  },
-  infoModalCloseButton: {
-    marginTop: 18,
-    backgroundColor: '#3b82f6',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  infoModalCloseText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  locationBtn: {
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#10b981',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#ecfdf5',
-  },
-  locationBtnText: {
-    color: '#10b981',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  addressNote: {
-    fontSize: 12,
-    color: '#b45309',
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-   locationNotice: {
-    fontSize: 13,
-    color: '#b45309',
-    backgroundColor: '#fffbeb',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    marginTop: 6,
-  },
+  emptyState: { alignItems: 'center', justifyContent: 'center', padding: 20 },
+  emptyText: { textAlign: 'center', color: '#94a3b8', fontSize: 15 },
+  addNewButton: { marginTop: 12, backgroundColor: '#0D0F10', paddingVertical: 12, paddingHorizontal: 18, borderRadius: 10 },
+  addNewButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  infoModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', paddingHorizontal: 24 },
+  infoModalBox: { backgroundColor: '#fff', borderRadius: 16, padding: 20 },
+  infoModalTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b', marginBottom: 12 },
+  infoModalText: { fontSize: 14, lineHeight: 22, color: '#475569' },
+  infoModalCloseButton: { marginTop: 18, backgroundColor: '#0D0F10', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  infoModalCloseText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
 
 export default BookingScreen;

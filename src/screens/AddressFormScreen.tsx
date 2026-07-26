@@ -20,6 +20,8 @@ import { api } from '../api/client';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCurrentLocation } from '../hooks/useCurrentLocation';
+import { useAddress, MY_ADDRESS_QUERY_KEY } from '../hooks/useAddress';
+import { Ionicons } from '@expo/vector-icons';
 
 const ADDRESS_KEY = 'motospot_my_addresses_cache';
 const API_URL = 'https://motospotbackend-production.up.railway.app';
@@ -37,7 +39,6 @@ type FormState = {
   formatted_address: string | null;
 };
 
-// only the string-valued fields that render as TextInputs / chips
 type TextFieldKey =
   | 'label'
   | 'address_line'
@@ -57,8 +58,7 @@ export default function AddressFormScreen() {
 
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
-  const [locationNotice, setLocationNotice] = useState<string | null> (null);
-
+  const [locationNotice, setLocationNotice] = useState<string | null>(null);
 
   const inputRefs = useRef<Partial<Record<TextFieldKey, TextInput | null>>>({});
 
@@ -75,7 +75,7 @@ export default function AddressFormScreen() {
   });
 
   const update = useCallback((field: TextFieldKey, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm((prev) => ({ ...prev, [field]: value }));
   }, []);
 
   const getAuthHeaders = async () => {
@@ -89,7 +89,8 @@ export default function AddressFormScreen() {
     };
   };
 
-  // Tap "Use my current location" → get coords → reverse geocode → prefill fields
+  const { selectAddress } = useAddress();
+
   const handleUseLocation = async () => {
     setLocationNotice(null);
     const coords = await getLocation();
@@ -108,7 +109,7 @@ export default function AddressFormScreen() {
       );
       const geo = res.data;
 
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
         latitude: geo.latitude ?? coords.latitude,
         longitude: geo.longitude ?? coords.longitude,
@@ -120,10 +121,9 @@ export default function AddressFormScreen() {
         formatted_address: geo.formatted_address ?? null,
       }));
 
-      setLocationNotice('📍 Address auto-filled. Please review before saving')
+      setLocationNotice('Address auto-filled. Please review before saving.');
     } catch (err) {
-      // Geocoding failed — keep raw coords so the pin still works; user types the rest
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -148,10 +148,10 @@ export default function AddressFormScreen() {
       let res;
       if (isEditing) {
         res = await api.put(`${API_URL}/address/${existingAddress.id}`, form, { headers });
-        Alert.alert('Success', 'Address updated! ✅');
+        Alert.alert('Success', 'Address updated');
       } else {
         res = await api.post(`${API_URL}/address/add`, form, { headers });
-        Alert.alert('Success', 'Address saved! 📍');
+        Alert.alert('Success', 'Address saved');
       }
 
       const newAddress = res.data;
@@ -184,21 +184,22 @@ export default function AddressFormScreen() {
 
   const FIELDS: {
     field: TextFieldKey;
+    label: string;
     placeholder: string;
     keyboardType: 'default' | 'numeric';
     autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters';
   }[] = [
-    { field: 'address_line', placeholder: 'Address Line *', keyboardType: 'default', autoCapitalize: 'words' },
-    { field: 'city', placeholder: 'City *', keyboardType: 'default', autoCapitalize: 'words' },
-    { field: 'state', placeholder: 'State *', keyboardType: 'default', autoCapitalize: 'words' },
-    { field: 'postal_code', placeholder: 'Postal Code *', keyboardType: 'numeric', autoCapitalize: 'none' },
-    { field: 'country', placeholder: 'Country', keyboardType: 'default', autoCapitalize: 'words' },
+    { field: 'address_line', label: 'Address line *', placeholder: 'House / street / area', keyboardType: 'default', autoCapitalize: 'words' },
+    { field: 'city', label: 'City *', placeholder: 'City', keyboardType: 'default', autoCapitalize: 'words' },
+    { field: 'state', label: 'State *', placeholder: 'State', keyboardType: 'default', autoCapitalize: 'words' },
+    { field: 'postal_code', label: 'Postal code *', placeholder: '560001', keyboardType: 'numeric', autoCapitalize: 'none' },
+    { field: 'country', label: 'Country', placeholder: 'Country', keyboardType: 'default', autoCapitalize: 'words' },
   ];
 
   const locationBusy = locating || geocoding;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <KeyboardAwareScrollView
           style={styles.flex}
@@ -212,96 +213,87 @@ export default function AddressFormScreen() {
           keyboardOpeningTime={250}
           enableResetScrollToCoords={false}
         >
-          <View style={styles.formCard}>
-            <Text style={styles.label}>Label *</Text>
-            <View style={styles.chipRow}>
-              {LABELS.map((l) => (
-                <TouchableOpacity
-                  key={l}
-                  style={[styles.chip, form.label === l && styles.chipActive]}
-                  onPress={() => update('label', l)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.chipText, form.label === l && styles.chipTextActive]}>
-                    {l}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <Text style={styles.groupLabel}>Where should we come?</Text>
 
-            <TouchableOpacity
-              style={styles.locationBtn}
-              onPress={handleUseLocation}
-              activeOpacity={0.85}
-              disabled={locationBusy}
-            >
-              {locationBusy ? (
-                <ActivityIndicator size="small" color="#16a34a" />
-              ) : (
-                <Text style={styles.locationBtnText}>📍 Use my current location</Text>
-              )}
-            </TouchableOpacity>
+          <Text style={styles.label}>Label *</Text>
+          <View style={styles.chipRow}>
+            {LABELS.map((l) => (
+              <TouchableOpacity
+                key={l}
+                style={[styles.chip, form.label === l && styles.chipActive]}
+                onPress={() => update('label', l)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.chipText, form.label === l && styles.chipTextActive]}>{l}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-            {locationNotice && (
-              <Text style={styles.locationNotice}> {locationNotice} </Text>
+          <TouchableOpacity
+            style={styles.locationChip}
+            onPress={handleUseLocation}
+            activeOpacity={0.85}
+            disabled={locationBusy}
+          >
+            {locationBusy ? (
+              <ActivityIndicator size="small" color="#10b981" />
+            ) : (
+              <>
+                <Ionicons name="location-sharp" size={16} color="#10b981" />
+                <Text style={styles.locationChipText}>Use my location</Text>
+              </>
             )}
-            {form.latitude != null && form.longitude != null && (
+          </TouchableOpacity>
+
+          {locationNotice && <Text style={styles.notice}>{locationNotice}</Text>}
+          {form.latitude != null && form.longitude != null && (
             <Text style={styles.coordText}>
               Location attached: {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
             </Text>
           )}
 
+          {FIELDS.map(({ field, label, placeholder, keyboardType, autoCapitalize }, index) => (
+            <View key={field}>
+              <Text style={[styles.label, { marginTop: 16 }]}>{label}</Text>
+              <TextInput
+                ref={(ref) => {
+                  inputRefs.current[field] = ref;
+                }}
+                style={styles.input}
+                placeholder={placeholder}
+                placeholderTextColor="#94a3b8"
+                keyboardType={keyboardType}
+                autoCapitalize={autoCapitalize}
+                autoCorrect={false}
+                returnKeyType={index === FIELDS.length - 1 ? 'done' : 'next'}
+                blurOnSubmit={index === FIELDS.length - 1}
+                value={form[field]}
+                onChangeText={(t) => update(field, t)}
+                onSubmitEditing={() => {
+                  const nextField = FIELDS[index + 1];
+                  if (nextField) {
+                    inputRefs.current[nextField.field]?.focus();
+                  } else {
+                    Keyboard.dismiss();
+                    handleSubmit();
+                  }
+                }}
+              />
+            </View>
+          ))}
 
-            
-
-            {FIELDS.map(({ field, placeholder, keyboardType, autoCapitalize }, index) => (
-              <View key={field}>
-                <Text style={styles.label}>{placeholder}</Text>
-                <TextInput
-                  ref={(ref) => {
-                    inputRefs.current[field] = ref;
-                  }}
-                  style={styles.input}
-                  placeholder={placeholder}
-                  keyboardType={keyboardType}
-                  autoCapitalize={autoCapitalize}
-                  autoCorrect={false}
-                  returnKeyType={index === FIELDS.length - 1 ? 'done' : 'next'}
-                  blurOnSubmit={index === FIELDS.length - 1}
-                  value={form[field]}
-                  onFocus={() => {
-                    setTimeout(() => {
-                      const ref = inputRefs.current[field];
-                      if (ref) {
-                        // @ts-ignore
-                        inputRefs.current[field]?.measure?.(() => {});
-                      }
-                    }, 150);
-                  }}
-                  onChangeText={(t) => update(field, t)}
-                  onSubmitEditing={() => {
-                    const nextField = FIELDS[index + 1];
-                    if (nextField) {
-                      inputRefs.current[nextField.field]?.focus();
-                    } else {
-                      Keyboard.dismiss();
-                      handleSubmit();
-                    }
-                  }}
-                />
-              </View>
-            ))}
-
+          <TouchableOpacity
+            style={styles.cta}
+            onPress={handleSubmit}
+            disabled={loading}
+            activeOpacity={0.9}
+          >
             {loading ? (
-              <ActivityIndicator size="large" color="#16a34a" style={styles.loadingSpinner} />
+              <ActivityIndicator color="#fff" />
             ) : (
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85}>
-                <Text style={styles.submitText}>
-                  {isEditing ? 'Save Changes' : 'Save Address'}
-                </Text>
-              </TouchableOpacity>
+              <Text style={styles.ctaText}>{isEditing ? 'Save changes' : 'Save address'}</Text>
             )}
-          </View>
+          </TouchableOpacity>
         </KeyboardAwareScrollView>
       </TouchableWithoutFeedback>
     </SafeAreaView>
@@ -310,81 +302,39 @@ export default function AddressFormScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: { flex: 1, backgroundColor: '#f3f4f6' },
-  scrollContainer: {
-    flexGrow: 1,
-    padding: 16,
-    paddingBottom: 120,
-    backgroundColor: '#f3f4f6',
-  },
-  formCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    marginBottom: 40,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 6,
-    marginTop: 12,
-  },
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  scrollContainer: { flexGrow: 1, padding: 18, paddingBottom: 140, backgroundColor: '#f8fafc' },
+
+  groupLabel: { fontSize: 16, fontWeight: '600', color: '#1e293b', marginTop: 4, marginBottom: 14 },
+  label: { fontSize: 13, fontWeight: '500', color: '#64748b', marginBottom: 6, marginLeft: 2 },
+
   input: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    padding: 13,
-    borderRadius: 10,
-    fontSize: 15,
-    backgroundColor: '#f9fafb',
-    marginBottom: 4,
+    borderWidth: 0.5, borderColor: '#e8ecf1', padding: 14, borderRadius: 14,
+    fontSize: 15, backgroundColor: '#fff', color: '#1e293b',
   },
+
   chipRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#f9fafb',
+    paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20,
+    borderWidth: 0.5, borderColor: '#e8ecf1', backgroundColor: '#fff',
   },
-  chipActive: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
-  chipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  chipActive: { backgroundColor: '#0D0F10', borderColor: '#0D0F10' },
+  chipText: { fontSize: 13, color: '#475569', fontWeight: '500' },
   chipTextActive: { color: '#fff' },
-  submitBtn: {
-    marginTop: 20,
-    backgroundColor: '#16a34a',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
+
+  locationChip: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6,
+    borderWidth: 1, borderColor: '#10b981', borderRadius: 20,
+    paddingVertical: 7, paddingHorizontal: 12, backgroundColor: '#ecfdf5', marginTop: 12,
   },
-  submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  loadingSpinner: { marginTop: 24 },
-  locationBtn: {
-    marginTop: 12,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: '#16a34a',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
+  locationChipText: { color: '#10b981', fontWeight: '600', fontSize: 13 },
+
+  cta: { backgroundColor: '#0D0F10', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
+  ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+
+  notice: {
+    fontSize: 13, color: '#b45309', backgroundColor: '#fffbeb', borderRadius: 8,
+    paddingVertical: 8, paddingHorizontal: 10, marginTop: 8,
   },
-  locationBtnText: { color: '#16a34a', fontWeight: '600', fontSize: 14 },
-  coordText: { fontSize: 12, color: '#6b7280', marginTop: 4, marginBottom: 4 },
-  locationNotice: {
-  fontSize: 13,
-  color: '#b45309',      // amber — gentle caution, not error-red
-  backgroundColor: '#fffbeb',
-  borderRadius: 8,
-  paddingVertical: 8,
-  paddingHorizontal: 10,
-  marginTop: 8,
-  marginBottom: 4,
-},
+  coordText: { fontSize: 12, color: '#94a3b8', marginTop: 8, marginLeft: 2 },
 });

@@ -22,7 +22,6 @@ import BookingsListScreen from './src/screens/BookingListScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import BikeFormScreen from './src/screens/BikeFormScreen';
 import AddressFormScreen from './src/screens/AddressFormScreen';
-import AddressListScreen from './src/screens/AddressListScreen';
 import EmergencyScreen from './src/screens/EmergencyScreen';
 
 // Log to catch undefined imports immediately
@@ -157,21 +156,6 @@ function AppStack() {
           headerTitleStyle: { color: '#F5F7F2', fontWeight: '700' },
           contentStyle: { backgroundColor: '#050505' },
         })}
-      />
-
-      <Stack.Screen
-        name="AddressList"
-        component={AddressListScreen}
-        options={{
-          headerShown: true,
-          title: 'My Addresses',
-          headerBackTitle: 'Back',
-          headerTintColor: '#F5F7F2',
-          headerStyle: { backgroundColor: '#050505' },
-          headerShadowVisible: false,
-          headerTitleStyle: { color: '#F5F7F2', fontWeight: '700' },
-          contentStyle: { backgroundColor: '#050505' },
-        }}
       />
     </Stack.Navigator>
   );

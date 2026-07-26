@@ -1,114 +1,84 @@
-// screens/ AddressListScreen.tsx
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    FlatList,
-    StyleSheet,
-    ActivityIndicator,
-    Alert
+  View, Text, TouchableOpacity, FlatList,
+  StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { useAddress, MY_ADDRESS_QUERY_KEY} from '../hooks/useAddress';
 
-import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
-import { api } from '../api/client';
 
-const API_URL = 'https://motospotbackend-production.up.railway.app';
 
-export default function AddressListScreen({navigation}: any) {
-    const [addresses, setAddresses] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedId, setSelectedId] = useState< string | null>(null);
 
-    
 
-    useEffect( () => {
-        loadAddresses();
-    }, []);
 
-    const loadAddresses = async () => {
-        try {
-            setLoading(true);
-            const token = await SecureStore.getItemAsync('accessToken');
+export default function AddressListScreen({ navigation }: any) {
+  const {
+    addresses,
+    isLoading: loading,
+    selectedAddress,
+    selectAddress,
+  } = useAddress();
 
-            if (!token) {
-                console.log('No token in secureStore')
-                Alert.alert('Session Expired','Please login again');
-                navigation.navigate('Login'); //redirect login
-                return
-            }
 
-            console.log("Token found:", token ? 'yes': 'no');
-            const addressesRes = await api.get(`${API_URL}/address/my-addresses`, {
-                headers: {Authorization: `Bearer ${token}`}
-            });
+const dbg = useAddress();
+console.log('useAddress path check →', typeof dbg.selectAddress, Object.keys(dbg));
 
-            setAddresses(addressesRes.data || []);
-        } catch (err: any) {
-            console.error('Addresses error:', err.response?.data);
-        } finally {
-            setLoading(false);
-        }
+  
 
-    };
+  const onSelect = (item: any) => {
+    selectAddress(item.id);   // writes to the shared cache the bar reads
+    console.log('Selected -> ', item.id);
+    navigation.goBack();
+  };
 
-    const selectAddress = async (address: any) => {
-        // Save to secureStore or emit to context
-        SecureStore.setItemAsync('currentAddress', JSON.stringify(address));
-        navigation.goBack(); //return to home
-    };
-
-    if (loading) {
-       return (
-        <View style={styles.center}>
-            <ActivityIndicator size="large" color= "#10b981"/>
-        </View>
-       );
-    }
-
+  if (loading) {
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}> Select Address </Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#10b981" />
+      </View>
+    );
+  }
 
-            <FlatList
-            data={addresses}
-            keyExtractor={(item)=> item.id}
-            renderItem={({item }) => (
-                <TouchableOpacity
-                style={[
-                    styles.addressCard,
-                    selectedId=== item.id && styles.selectedAddress
-                ]}
-                onPress= {() => selectAddress(item)}
-                >
-                <View>
-                    <Text style = {styles.addressName}>{item.name}</Text>
-                    <Text style = {styles.addressDetails}>{item.address_line}</Text> 
-                    <Text style= {styles.addressDetails}>{`${item.city}, ${item.state} ${item.postal_code}`}</Text>   
-                    <Text style={styles.phone}>{item.phone}</Text>
-                </View>
-                {selectedId===item.id && <Text style={styles.selectedIcon}>✓</Text>}
-                </TouchableOpacity>
-            )}
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}> Select Address </Text>
 
-            ListEmptyComponent={
+      <FlatList
+        data={addresses}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => {
+          const isSelected = selectedAddress?.id === item.id;
+          return (
+            <TouchableOpacity
+              style={[styles.addressCard, isSelected && styles.selectedAddress]}
+              onPress={() => onSelect(item)}
+            >
+              <View>
+                <Text style={styles.addressName}>{item.label}</Text>
+                <Text style={styles.addressDetails}>{item.address_line}</Text>
+                <Text style={styles.addressDetails}>
+                  {`${item.city}, ${item.state} ${item.postal_code}`}
+                </Text>
+              </View>
+              {isSelected && <Text style={styles.selectedIcon}>✓</Text>}
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>No addresses saved</Text>
           </View>
         }
+      />
 
-        />
-         <TouchableOpacity 
+      <TouchableOpacity
         style={styles.addButton}
         onPress={() => navigation.navigate('AddressForm')}
       >
         <Text style={styles.addButtonText}>+ Add New Address</Text>
       </TouchableOpacity>
-        </View>
-    );
+    </View>
+  );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
