@@ -97,7 +97,7 @@ function TabNavigator() {
       <Tab.Screen
         name="Garage"
         component={GarageScreen}
-        options={{ title: 'My Garage' }}
+        options={{ title: 'My Vehicles' }}
       />
       <Tab.Screen
         name="Book"

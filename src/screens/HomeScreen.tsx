@@ -68,6 +68,15 @@ const posters: Poster[] = [
 ];
 
 const services = [
+
+  {
+    id: 'ev-repair',
+    title: 'EV REPAIR',
+    subtitle: 'For electric Vehicles',
+    icon: "battery-half-outline",
+    serviceType: "EV Repair"
+  },
+
   {
     id: 'general-service',
     title: 'GENERAL\nSERVICE',
@@ -96,6 +105,17 @@ const services = [
     icon: 'warning-outline',
     serviceType: 'Accident Repair',
   },
+  {
+    id: 'minor-service',
+    title: 'MINOR SERVICE',
+    subtitle: 'at your doorstep',
+    icon: 'home-outline',
+    serviceType: 'Minor Service'
+  },
+
+  
+
+
 ];
 
 export default function HomeScreen({ navigation }: any) {
@@ -222,7 +242,7 @@ export default function HomeScreen({ navigation }: any) {
         source={typeof item.image === 'string' ? { uri: item.image } : item.image}
         style={styles.bannerImage}
         imageStyle={styles.bannerImageStyle}
-        resizeMode="cover"
+        resizeMode="contain"
       >
         <View style={styles.bannerOverlay} />
       </ImageBackground>
@@ -565,7 +585,7 @@ const styles = StyleSheet.create({
   },
   bannerImage: {
   width: '100%',
-  aspectRatio: 3 / 2,      // was: height: 255
+  aspectRatio: 7 / 5,      // was: height: 255
   justifyContent: 'flex-end',
   },
   bannerImageStyle: {
@@ -602,7 +622,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.83)',
     padding: 14,
     marginBottom: 2,
     overflow: 'hidden',
@@ -620,7 +640,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(134, 99, 99, 0.09)',
   },
   serviceTextBlock: {
     paddingRight: 12,

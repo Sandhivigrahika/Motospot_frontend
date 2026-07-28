@@ -656,9 +656,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
 
   header: { backgroundColor: '#0D0F10', paddingHorizontal: 20, paddingTop: 2, paddingBottom: 18 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 25 },
-  brandMark: { width: 35, height: 35, resizeMode: 'contain' },
-  brandName: { fontSize: 12, color: '#8B948C', letterSpacing: 1 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28 },
+  brandMark: { width: 50, height: 50, resizeMode: 'contain' },
+  brandName: { fontSize: 22, fontWeight: '700', color: '#F5F7F2', letterSpacing: 1.5 },
   headerTitle: { fontSize: 20, fontWeight: '600', color: '#F5F7F2', lineHeight: 28, marginBottom: 5 },
   headerSub: { fontSize: 13, color: '#8B948C' },
 
