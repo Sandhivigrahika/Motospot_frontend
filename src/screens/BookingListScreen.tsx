@@ -177,7 +177,7 @@ const BookingsListScreen = () => {
             // Re-fetch and check the actual state before deciding what to show.
             try {
               const token = await SecureStore.getItemAsync('accessToken');
-              const res = await api.get('/bookings/me?status=active', {
+              const res = await api.get('/bookings/me?status=active', { //fetches status
                 headers: { Authorization: `Bearer ${token}` },
               });
               const stillActive = res.data.some((b: Booking) => b.id === bookingId);
@@ -356,7 +356,7 @@ const BookingsListScreen = () => {
                   </Text>
 
                   <Text style={styles.addressText}>
-                    {item.manual_address || item.pickup_address || '📍 No address provided'}
+                    {item.manual_address || item.pickup_address || ' No address provided'}
                   </Text>
 
                   {item.notes ? <Text style={styles.notesText}>📝 {item.notes}</Text> : null}
