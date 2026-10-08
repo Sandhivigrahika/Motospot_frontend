@@ -1,0 +1,1 @@
+CommandError: Can't determine id of Simulator app; the Simulator is most likely not installed on this machine. Run `sudo xcode-select -s /Applications/Xcode.app`

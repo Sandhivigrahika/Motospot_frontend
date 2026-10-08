@@ -1,49 +1,88 @@
 {
-  "name": "motospotapp",
-  "version": "1.0.0",
-  "main": "index.ts",
-  "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web"
+  "expo": {
+    "name": "Motospot",
+    "slug": "motospot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.motospot.app"
+    },
+    "android": {
+      "package": "in.motospot.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#050505"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "INTERNET"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Motospot uses your location to attach an accurate pickup point to your bookings."
+        }
+      ],
+      "expo-build-properties"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f53ede52-5490-45ad-9923-d33e8a9dc310"
+      }
+    },
+    "owner": "neelhans007s-organization"
   },
+  "name": "Motospot_frontend",
+  "version": "1.0.0",
+  "scripts": {},
   "dependencies": {
-    "@expo/vector-icons": "^15.0.3",
+    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-community/datetimepicker": "8.6.0",
-    "@react-native-google-signin/google-signin": "^16.1.2",
-    "@react-navigation/bottom-tabs": "^6.5.20",
-    "@react-navigation/native": "^6.1.10",
-    "@react-navigation/native-stack": "6.11.0",
-    "@tanstack/react-query": "^5.90.21",
-    "axios": "^1.13.5",
-    "expo": "^55.0.31",
-    "expo-auth-session": "~55.0.18",
-    "expo-crypto": "~55.0.19",
-    "expo-dev-client": "~55.0.40",
-    "expo-font": "~55.0.8",
-    "expo-linear-gradient": "~55.0.18",
-    "expo-location": "~55.1.14",
-    "expo-secure-store": "~55.0.18",
-    "expo-status-bar": "~55.0.6",
-    "expo-web-browser": "~55.0.20",
-    "react": "19.2.0",
-    "react-native": "0.83.10",
+    "@react-native-community/datetimepicker": "9.2.1",
+    "@react-native-google-signin/google-signin": "^16.1.5",
+    "@react-navigation/bottom-tabs": "^6.6.1",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.11.0",
+    "@tanstack/react-query": "^5.104.1",
+    "axios": "^1.20.0",
+    "expo": "^58.0.6",
+    "expo-auth-session": "~58.0.9",
+    "expo-build-properties": "~58.0.10",
+    "expo-crypto": "~58.0.5",
+    "expo-dev-client": "~58.0.11",
+    "expo-font": "~58.0.7",
+    "expo-linear-gradient": "~58.0.3",
+    "expo-location": "~58.0.12",
+    "expo-secure-store": "~58.0.2",
+    "expo-status-bar": "~58.0.3",
+    "expo-web-browser": "~58.0.6",
+    "react": "^19.3.0",
+    "react-native": "0.88.0-rc.3",
     "react-native-dropdown-picker": "^5.4.6",
-    "react-native-gesture-handler": "~2.30.0",
+    "react-native-gesture-handler": "~3.2.1",
     "react-native-keyboard-aware-scroll-view": "^0.9.5",
-    "react-native-reanimated": "4.2.1",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.23.0",
-    "react-native-worklets": "0.7.4"
+    "react-native-safe-area-context": "~5.9.1",
+    "react-native-screens": "^4.28.0"
   },
   "devDependencies": {
-    "@types/react": "19.2.18",
-    "typescript": "~5.9.2"
-  },
-  "private": true,
-  "expo": {
-    "android": {}
+    "typescript": "~6.0.3"
   }
 }
