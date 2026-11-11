@@ -9,6 +9,10 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
@@ -67,11 +71,13 @@ const SupportRequestModal: React.FC<SupportRequestModalProps> = ({
 
   const handleClose = () => {
     if (loading) return;
+    Keyboard.dismiss();
     resetState();
     onClose();
   };
 
   const handleSubmit = async () => {
+    Keyboard.dismiss();
     try {
       setLoading(true);
 
@@ -131,144 +137,187 @@ const SupportRequestModal: React.FC<SupportRequestModalProps> = ({
     }
   };
 
+  const handleOpenPhoneEdit = () => {
+    Keyboard.dismiss();
+    openPhoneEdit();
+  };
+
+  const handleClosePhoneModal = () => {
+    Keyboard.dismiss();
+    closePhoneModal();
+  };
+
+  const handleSavePhone = () => {
+    Keyboard.dismiss();
+    savePhone();
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <Text style={styles.title}>Need Help?</Text>
-          <Text style={styles.subtitle}>
-            Create a support request and the admin team will contact you.
-          </Text>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.overlay}>
+          {/* Tapping the dimmed area above the sheet closes the keyboard */}
+          <Pressable style={styles.flex} onPress={Keyboard.dismiss} />
 
-          {/* Phone number row */}
-          <View style={styles.phoneRow}>
-            <View style={styles.phoneInfo}>
-              <Text style={styles.label}>Contact Number</Text>
-              <Text style={styles.phoneValue}>
-                {formattedPhone || 'No number added'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.phoneEditBtn}
-              onPress={openPhoneEdit}
-              activeOpacity={0.85}
+          <View style={styles.sheet}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
             >
-              <Text style={styles.phoneEditBtnText}>
-                {userPhone ? 'Edit' : 'Add'}
+              <Text style={styles.title}>Need Help?</Text>
+              <Text style={styles.subtitle}>
+                Create a support request and the admin team will contact you.
               </Text>
-            </TouchableOpacity>
-          </View>
 
-          <Text style={styles.label}>Enquiry Category</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryRow}
-          >
-            {ENQUIRY_OPTIONS.map((item) => {
-              const active = selectedCategory === item.value;
-              return (
+              {/* Phone number row */}
+              <View style={styles.phoneRow}>
+                <View style={styles.phoneInfo}>
+                  <Text style={styles.label}>Contact Number</Text>
+                  <Text style={styles.phoneValue}>
+                    {formattedPhone || 'No number added'}
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  key={item.value}
-                  style={[styles.categoryChip, active && styles.categoryChipActive]}
-                  onPress={() => setSelectedCategory(item.value)}
+                  style={styles.phoneEditBtn}
+                  onPress={handleOpenPhoneEdit}
                   activeOpacity={0.85}
                 >
-                  <Text
-                    style={[styles.categoryChipText, active && styles.categoryChipTextActive]}
-                  >
-                    {item.label}
+                  <Text style={styles.phoneEditBtnText}>
+                    {userPhone ? 'Edit' : 'Add'}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+              </View>
 
-          <Text style={styles.label}>Message</Text>
-          <TextInput
-            style={styles.messageInput}
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Describe your issue or request"
-            placeholderTextColor="#94a3b8"
-            multiline
-            textAlignVertical="top"
-            maxLength={500}
-          />
+              <Text style={styles.label}>Enquiry Category</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.categoryRow}
+              >
+                {ENQUIRY_OPTIONS.map((item) => {
+                  const active = selectedCategory === item.value;
+                  return (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={[styles.categoryChip, active && styles.categoryChipActive]}
+                      onPress={() => setSelectedCategory(item.value)}
+                      activeOpacity={0.85}
+                    >
+                      <Text
+                        style={[styles.categoryChipText, active && styles.categoryChipTextActive]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} disabled={loading}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
+              <Text style={styles.label}>Message</Text>
+              <TextInput
+                style={styles.messageInput}
+                value={message}
+                onChangeText={setMessage}
+                placeholder="Describe your issue or request"
+                placeholderTextColor="#94a3b8"
+                multiline
+                textAlignVertical="top"
+                maxLength={500}
+              />
 
-            <TouchableOpacity
-              style={[styles.submitBtn, loading && { opacity: 0.7 }]}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#08110a" />
-              ) : (
-                <Text style={styles.submitBtnText}>Submit</Text>
-              )}
-            </TouchableOpacity>
+              <View style={styles.footer}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} disabled={loading}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, loading && { opacity: 0.7 }]}
+                  onPress={handleSubmit}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#08110a" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>Submit</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Phone edit modal (nested) */}
       <Modal
         visible={phoneModal}
         transparent
         animationType="fade"
-        onRequestClose={closePhoneModal}
+        onRequestClose={handleClosePhoneModal}
       >
-        <View style={styles.overlay}>
-          <View style={styles.phoneSheet}>
-            <Text style={styles.title}>
-              {userPhone ? 'Update Phone Number' : 'Add Phone Number'}
-            </Text>
-            <Text style={styles.subtitle}>
-              We'll use this number to contact you about your request.
-            </Text>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.overlay}>
+            <Pressable style={styles.flex} onPress={Keyboard.dismiss} />
 
-            <Text style={styles.label}>Phone Number</Text>
-            <View style={styles.phoneInputWrap}>
-              <Text style={styles.phonePrefix}>+91</Text>
-              <TextInput
-                style={styles.phoneInput}
-                value={phoneInput}
-                onChangeText={(text) => setPhoneInput(text.replace(/\D/g, '').slice(0, 10))}
-                placeholder="10-digit number"
-                placeholderTextColor="#94a3b8"
-                keyboardType="number-pad"
-                maxLength={10}
-              />
-            </View>
+            <View style={styles.phoneSheet}>
+              <Text style={styles.title}>
+                {userPhone ? 'Update Phone Number' : 'Add Phone Number'}
+              </Text>
+              <Text style={styles.subtitle}>
+                We'll use this number to contact you about your request.
+              </Text>
 
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={closePhoneModal}
-                disabled={phoneLoading}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
+              <Text style={styles.label}>Phone Number</Text>
+              <View style={styles.phoneInputWrap}>
+                <Text style={styles.phonePrefix}>+91</Text>
+                <TextInput
+                  style={styles.phoneInput}
+                  value={phoneInput}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/\D/g, '').slice(0, 10);
+                    setPhoneInput(digits);
+                    // number-pad has no Return key on iOS, so close it once the number is complete
+                    if (digits.length === 10) Keyboard.dismiss();
+                  }}
+                  placeholder="10-digit number"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                />
+              </View>
 
-              <TouchableOpacity
-                style={[styles.submitBtn, phoneLoading && { opacity: 0.7 }]}
-                onPress={savePhone}
-                disabled={phoneLoading}
-              >
-                {phoneLoading ? (
-                  <ActivityIndicator color="#08110a" />
-                ) : (
-                  <Text style={styles.submitBtnText}>Save</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.footer}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={handleClosePhoneModal}
+                  disabled={phoneLoading}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, phoneLoading && { opacity: 0.7 }]}
+                  onPress={handleSavePhone}
+                  disabled={phoneLoading}
+                >
+                  {phoneLoading ? (
+                    <ActivityIndicator color="#08110a" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Modal>
   );
@@ -277,6 +326,9 @@ const SupportRequestModal: React.FC<SupportRequestModalProps> = ({
 export default SupportRequestModal;
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(2,6,23,0.55)',

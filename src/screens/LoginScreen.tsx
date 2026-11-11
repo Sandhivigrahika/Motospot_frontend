@@ -16,6 +16,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
+import { AppleSignInButton } from '../components/AppleSignInButton';
 
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 
@@ -95,13 +96,14 @@ export default function LoginScreen({ navigation }: any) {
   const [nameError, setNameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
 
-  // transient toast (network / server / google errors)
+  // transient toast (network / server / google / apple errors)
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const { devSignIn } = useAuth();
   const { googleLogin, googleLoading } = useGoogleSignIn();
 
-  const phoneInputRef = useRef<TextInput>(null);
+  // ComponentRef matches the newer React Native TextInput types (fixes the .focus() / ref TS errors)
+  const phoneInputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   const showToast = useCallback((message: string, type: ToastType = 'error') => {
     // replace any existing toast
@@ -176,7 +178,6 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   const handleGoogleLogin = async () => {
-    
     try {
       await googleLogin();
     } catch (error: any) {
@@ -286,6 +287,15 @@ export default function LoginScreen({ navigation }: any) {
                   <Text style={styles.googleButtonText}>Continue with Google</Text>
                 )}
               </TouchableOpacity>
+
+              {/* Renders nothing on Android / devices without Apple sign-in */}
+              <AppleSignInButton
+                appearance="white"
+                height={48}
+                cornerRadius={12}
+                style={styles.appleButton}
+                onError={(msg) => showToast(msg)}
+              />
 
               {__DEV__ && (
                 <TouchableOpacity
@@ -409,6 +419,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  appleButton: {
+    marginTop: 12,
   },
   devLoginButton: {
     marginTop: 16,

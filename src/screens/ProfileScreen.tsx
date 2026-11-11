@@ -20,6 +20,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +29,9 @@ const BASE = 'https://motospotbackend-production.up.railway.app';
 
 // Web resource required by Google Play's account deletion policy.
 const DELETION_WEB_URL = 'https://motospot.in/delete-account';
+
+// Privacy policy — must be reachable inside the app (App Store guideline 5.1.1(i)).
+const PRIVACY_POLICY_URL = 'https://motospot.in/privacy_policy/';
 
 const COLORS = {
   bg: '#050505',
@@ -181,7 +185,7 @@ export default function ProfileScreen() {
     try {
       const headers = await getHeaders();
       res = await fetch(`${BASE}/user/phone`, {
-        method: 'PUT', 
+        method: 'PUT',
         headers,
         body: JSON.stringify({ number }),
       });
@@ -284,7 +288,7 @@ export default function ProfileScreen() {
   const handleDeleteAccount = async () => {
     if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
       Alert.alert('Type DELETE to continue', 'The confirmation text does not match.');
-      return; // <- this return was missing
+      return;
     }
 
     setDeleteLoading(true);
@@ -292,7 +296,7 @@ export default function ProfileScreen() {
     let res: Response;
     try {
       const headers = await getHeaders();
-      res = await fetch(`${BASE}/account`, {
+      res = await fetch(`${BASE}/account/delete`, {
         method: 'DELETE',
         headers,
         body: JSON.stringify({ confirmation: 'DELETE' }),
@@ -341,6 +345,21 @@ export default function ProfileScreen() {
     Linking.openURL(DELETION_WEB_URL).catch(() =>
       Alert.alert('Could not open link', `Visit ${DELETION_WEB_URL} in your browser.`)
     );
+  };
+
+  // Opens inside the app (Safari sheet on iOS, Custom Tab on Android)
+  const openPrivacyPolicy = async () => {
+    try {
+      await WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL, {
+        controlsColor: COLORS.primary,
+        toolbarColor: COLORS.bg,
+        dismissButtonStyle: 'close',
+      });
+    } catch {
+      Linking.openURL(PRIVACY_POLICY_URL).catch(() =>
+        Alert.alert('Could not open link', `Visit ${PRIVACY_POLICY_URL} in your browser.`)
+      );
+    }
   };
 
   const canDelete = deleteConfirmText.trim().toUpperCase() === 'DELETE';
@@ -573,7 +592,26 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 32 }} />
+          {/* ── Legal footer ────────────────────────────────────────────── */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.footerLink}
+              onPress={openPrivacyPolicy}
+              activeOpacity={0.75}
+              accessibilityRole="link"
+              accessibilityLabel="Open privacy policy"
+            >
+              <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.textSecondary} />
+              <Text style={styles.footerLinkText}>Privacy Policy</Text>
+              <Ionicons name="open-outline" size={14} color={COLORS.textMuted} />
+            </TouchableOpacity>
+
+            <Text style={styles.footerMeta}>
+              © {new Date().getFullYear()} Motospot Auto-Tech Services Pvt. Ltd.
+            </Text>
+          </View>
+
+          <View style={{ height: 24 }} />
         </ScrollView>
 
         <EditModal
@@ -1050,6 +1088,35 @@ const styles = StyleSheet.create({
   dangerLink: {
     marginTop: 16,
     fontSize: 13,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+
+  // ── Legal footer ───────────────────────────────────────────────────────────
+  footer: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  footerLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceSoft,
+  },
+  footerLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  footerMeta: {
+    marginTop: 14,
+    fontSize: 12,
     color: COLORS.textMuted,
     textAlign: 'center',
   },

@@ -13,7 +13,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
+  Pressable,
   Keyboard,
 } from 'react-native';
 
@@ -107,11 +107,12 @@ const BookingsListScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [feedbackVisible, setfeedbackVisible] = useState(false);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackBookingId, setFeedbackBookingId] = useState<string | null>(null);
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState<string>('');
-  const [submittedFeedback, setsubmittedFeedback] = useState<Set<string>>(new Set());
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [submittedFeedback, setSubmittedFeedback] = useState<Set<string>>(new Set());
 
   const loadBookings = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -154,66 +155,87 @@ const BookingsListScreen = () => {
   );
 
   const handleCancel = async (bookingId: string) => {
-  Alert.alert(
-    'Cancel Booking',
-    'Are you sure you want to cancel this booking?',
-    [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Cancel',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const token = await SecureStore.getItemAsync('accessToken');
-            await api.post(
-              `${API_URL}/bookings/${bookingId}/cancel`,
-              {},
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            Alert.alert('Done', 'Booking cancelled successfully');
-            loadBookings();
-          } catch (error: any) {
-            // The request threw — but the cancel may have succeeded server-side.
-            // Re-fetch and check the actual state before deciding what to show.
+    Alert.alert(
+      'Cancel Booking',
+      'Are you sure you want to cancel this booking?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
             try {
               const token = await SecureStore.getItemAsync('accessToken');
-              const res = await api.get('/bookings/me?status=active', { //fetches status
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              const stillActive = res.data.some((b: Booking) => b.id === bookingId);
-              setBookings(res.data);
-
-              if (!stillActive) {
-                // It's gone from the active list → cancel actually worked
-                Alert.alert('Done', 'Booking cancelled successfully');
-              } else {
-                // Genuinely still active → real failure
-                const detail = error?.response?.data?.detail;
-                Alert.alert('Error', detail || 'Could not cancel booking. Please try again.');
-              }
-            } catch {
-              // Couldn't even re-check (network still down) — refresh and stay quiet-ish
-              loadBookings();
-              Alert.alert(
-                'Check your connection',
-                'We could not confirm the cancellation. Please refresh in a moment.'
+              await api.post(
+                `${API_URL}/bookings/${bookingId}/cancel`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
               );
+              Alert.alert('Done', 'Booking cancelled successfully');
+              loadBookings();
+            } catch (error: any) {
+              // The request threw — but the cancel may have succeeded server-side.
+              // Re-fetch and check the actual state before deciding what to show.
+              try {
+                const token = await SecureStore.getItemAsync('accessToken');
+                const res = await api.get('/bookings/me?status=active', {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                const stillActive = res.data.some((b: Booking) => b.id === bookingId);
+                setBookings(res.data);
+
+                if (!stillActive) {
+                  // It's gone from the active list → cancel actually worked
+                  Alert.alert('Done', 'Booking cancelled successfully');
+                } else {
+                  // Genuinely still active → real failure
+                  const detail = error?.response?.data?.detail;
+                  Alert.alert('Error', detail || 'Could not cancel booking. Please try again.');
+                }
+              } catch {
+                // Couldn't even re-check (network still down)
+                loadBookings();
+                Alert.alert(
+                  'Check your connection',
+                  'We could not confirm the cancellation. Please refresh in a moment.'
+                );
+              }
             }
-          }
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
+
+  // ---------- Feedback ----------
+
+  const openFeedback = (bookingId: string) => {
+    setFeedbackBookingId(bookingId);
+    setRating(0);
+    setComment('');
+    setFeedbackVisible(true);
+  };
+
+  const closeFeedback = () => {
+    if (feedbackSubmitting) return;
+    Keyboard.dismiss();
+    setFeedbackVisible(false);
+    setFeedbackBookingId(null);
+    setRating(0);
+    setComment('');
+  };
 
   const submitFeedback = async () => {
-    if (!feedbackBookingId) return;
+    if (!feedbackBookingId || feedbackSubmitting) return;
+    Keyboard.dismiss();
+
     if (rating === 0) {
       Alert.alert('Rating required', 'Please select at least 1 star');
       return;
     }
 
     try {
+      setFeedbackSubmitting(true);
       const token = await SecureStore.getItemAsync('accessToken');
 
       await api.post(
@@ -228,22 +250,33 @@ const BookingsListScreen = () => {
         }
       );
 
-      Alert.alert('Thank you!', 'Your feedback has been submitted');
-
-      setsubmittedFeedback(prev => {
-        const newSet = new Set(prev);
-        newSet.add(feedbackBookingId);
-        return newSet;
+      const submittedId = feedbackBookingId;
+      setSubmittedFeedback((prev) => {
+        const next = new Set(prev);
+        next.add(submittedId);
+        return next;
       });
-      setfeedbackVisible(false);
+
+      setFeedbackVisible(false);
       setFeedbackBookingId(null);
       setRating(0);
       setComment('');
-    } catch (error) {
+
+      Alert.alert('Thank you!', 'Your feedback has been submitted');
+    } catch (error: unknown) {
       console.log('Feedback error:', error);
-      Alert.alert('Error', 'Could not submit feedback. Try again.');
+      let message = 'Could not submit feedback. Try again.';
+      if (axios.isAxiosError(error)) {
+        const detail = error.response?.data?.detail;
+        if (typeof detail === 'string') message = detail;
+      }
+      Alert.alert('Error', message);
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
+
+  // ---------- Rendering helpers ----------
 
   const getStatusConfig = (status: string) => {
     const config: Record<string, { color: string; bgColor: string }> = {
@@ -263,7 +296,7 @@ const BookingsListScreen = () => {
   const renderStatusBadge = (status: string) => {
     const statusText = status
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
     const { color, bgColor } = getStatusConfig(status);
 
@@ -296,12 +329,71 @@ const BookingsListScreen = () => {
           <TouchableOpacity
             key={s}
             onPress={() => setRating(s)}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             accessibilityRole="button"
             accessibilityLabel={`Rate ${s} star${s > 1 ? 's' : ''}`}
           >
             <Text style={[styles.star, rating >= s && styles.starActive]}>★</Text>
           </TouchableOpacity>
         ))}
+      </View>
+    );
+  };
+
+  const renderBooking = ({ item }: { item: Booking }) => {
+    const feedbackDone = submittedFeedback.has(item.id);
+
+    return (
+      <View style={styles.bookingCard}>
+        <View style={styles.headerRow}>
+          <View style={styles.bikeSection}>
+            <Text style={styles.companyName} numberOfLines={1}>
+              {item.company_name}
+            </Text>
+            <Text style={styles.modelName} numberOfLines={1}>
+              {item.model_name}
+            </Text>
+            <Text style={styles.regNumber} numberOfLines={1}>
+              {item.registration_number}
+            </Text>
+          </View>
+          {renderStatusBadge(item.status)}
+        </View>
+
+        <Text style={styles.dateTime}>
+          🗓 {formatDateTime(item.preferred_date, item.preferred_time)}
+        </Text>
+
+        <Text style={styles.conditionText}>Condition: {item.current_condition}</Text>
+
+        <Text style={styles.addressText}>
+          {item.manual_address || item.pickup_address || 'No address provided'}
+        </Text>
+
+        {item.notes ? <Text style={styles.notesText}>📝 {item.notes}</Text> : null}
+
+        {item.status === 'confirmed' && (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => handleCancel(item.id)}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+          </TouchableOpacity>
+        )}
+
+        {item.status === 'completed' && (
+          <TouchableOpacity
+            onPress={() => openFeedback(item.id)}
+            disabled={feedbackDone}
+            style={[styles.feedbackButton, feedbackDone && styles.feedbackButtonDone]}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.feedbackButtonText}>
+              {feedbackDone ? 'Feedback Submitted' : 'Rate Service'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -318,125 +410,78 @@ const BookingsListScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <FlatList
+        data={bookings}
+        keyExtractor={(item) => item.id}
+        refreshing={refreshing}
+        onRefresh={() => loadBookings(true)}
+        ListEmptyComponent={renderEmptyState}
+        renderItem={renderBooking}
+        style={styles.list}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {/* Feedback modal — keyboard handling must live INSIDE the Modal,
+          because a Modal renders above the screen, outside its parent views */}
+      <Modal
+        visible={feedbackVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeFeedback}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.flex}>
-            <FlatList
-              data={bookings}
-              keyExtractor={(item) => item.id}
-              refreshing={refreshing}
-              onRefresh={() => loadBookings(true)}
-              ListEmptyComponent={renderEmptyState}
-              renderItem={({ item }) => (
-                <View style={styles.bookingCard}>
-                  <View style={styles.headerRow}>
-                    <View style={styles.bikeSection}>
-                      <Text style={styles.companyName} numberOfLines={1}>
-                        {item.company_name}
-                      </Text>
-                      <Text style={styles.modelName} numberOfLines={1}>
-                        {item.model_name}
-                      </Text>
-                      <Text style={styles.regNumber} numberOfLines={1}>
-                        {item.registration_number}
-                      </Text>
-                    </View>
-                    {renderStatusBadge(item.status)}
-                  </View>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable style={styles.modalOverlay} onPress={Keyboard.dismiss}>
+            {/* Inner Pressable swallows taps so tapping the card doesn't bubble to the overlay */}
+            <Pressable style={styles.modalContent} onPress={Keyboard.dismiss}>
+              <Text style={styles.modalTitle}>Rate your service</Text>
 
-                  <Text style={styles.dateTime}>
-                    🗓 {formatDateTime(item.preferred_date, item.preferred_time)}
-                  </Text>
+              {renderStars()}
 
-                  <Text style={styles.conditionText}>
-                    Condition: {item.current_condition}
-                  </Text>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Add a note (optional)"
+                placeholderTextColor={COLORS.textMuted}
+                multiline
+                maxLength={500}
+                value={comment}
+                onChangeText={setComment}
+              />
 
-                  <Text style={styles.addressText}>
-                    {item.manual_address || item.pickup_address || ' No address provided'}
-                  </Text>
+              <View style={styles.modalButtonsRow}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalCancel]}
+                  onPress={closeFeedback}
+                  disabled={feedbackSubmitting}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.modalCancelText}>Later</Text>
+                </TouchableOpacity>
 
-                  {item.notes ? <Text style={styles.notesText}>📝 {item.notes}</Text> : null}
-
-                  {item.status === 'confirmed' && !submittedFeedback.has(item.id) && (
-                    <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={() => handleCancel(item.id)}
-                      activeOpacity={0.9}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel Booking</Text>
-                    </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.modalSubmit,
+                    feedbackSubmitting && { opacity: 0.7 },
+                  ]}
+                  onPress={submitFeedback}
+                  disabled={feedbackSubmitting}
+                  activeOpacity={0.9}
+                >
+                  {feedbackSubmitting ? (
+                    <ActivityIndicator color={COLORS.textDark} />
+                  ) : (
+                    <Text style={styles.modalSubmitText}>Submit</Text>
                   )}
-
-                  {item.status === 'completed' && !submittedFeedback.has(item.id) && (
-                    <TouchableOpacity
-                      disabled={submittedFeedback.has(item.id)}
-                      style={[
-                        styles.feedbackButton,
-                        submittedFeedback.has(item.id) && {
-                          opacity: 0.5,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.feedbackButtonText}>
-                        {submittedFeedback.has(item.id) ? 'Feedback Submitted' : 'Rate Service'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-              style={styles.list}
-              contentContainerStyle={styles.container}
-              showsVerticalScrollIndicator={false}
-            />
-
-            <Modal
-              visible={feedbackVisible}
-              transparent
-              animationType="fade"
-              onRequestClose={() => setfeedbackVisible(false)}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Rate your service</Text>
-
-                  {renderStars()}
-
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder="Add a note (optional)"
-                    placeholderTextColor={COLORS.textMuted}
-                    multiline
-                    value={comment}
-                    onChangeText={setComment}
-                  />
-
-                  <View style={styles.modalButtonsRow}>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.modalCancel]}
-                      onPress={() => setfeedbackVisible(false)}
-                      activeOpacity={0.9}
-                    >
-                      <Text style={styles.modalCancelText}>Later</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.modalSubmit]}
-                      onPress={submitFeedback}
-                      activeOpacity={0.9}
-                    >
-                      <Text style={styles.modalSubmitText}>Submit</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                </TouchableOpacity>
               </View>
-            </Modal>
-          </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -576,6 +621,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  feedbackButtonDone: {
+    opacity: 0.5,
+  },
   feedbackButtonText: {
     color: COLORS.textDark,
     fontWeight: '800',
@@ -634,6 +682,7 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     minHeight: 44,
+    minWidth: 88,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 12,

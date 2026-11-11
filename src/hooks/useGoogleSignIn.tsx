@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Platform } from 'react-native';
 
 import {
@@ -11,7 +11,15 @@ import { GOOGLE_AUTH_CONFIG } from '../config/googleAuth';
 import { loginWithGoogleBackend } from '../services/googleAuthService';
 import { useAuth } from '../context/AuthContext';
 
-let isConfigured = false;
+// Configure once, as soon as this module loads — before any sign-in can run.
+if (Platform.OS === 'ios' && !GOOGLE_AUTH_CONFIG.iosClientId) {
+  console.warn('[GoogleSignIn] iosClientId is missing — check src/config/googleAuth.ts');
+}
+
+GoogleSignin.configure({
+  webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+  iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+});
 
 function getDeviceId() {
   return `${Platform.OS}-google-login`;
@@ -21,20 +29,15 @@ export function useGoogleSignIn() {
   const { signIn } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  useEffect(() => {
-    if (!isConfigured) {
-      GoogleSignin.configure({
-        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-      });
-      isConfigured = true;
-    }
-  }, []);
-
   const googleLogin = async () => {
     try {
       setGoogleLoading(true);
 
-      await GoogleSignin.hasPlayServices();
+      // Play Services only exist on Android
+      if (Platform.OS === 'android') {
+        await GoogleSignin.hasPlayServices();
+      }
+
       const signInResult = await GoogleSignin.signIn();
 
       const idToken =
@@ -64,7 +67,6 @@ export function useGoogleSignIn() {
           case statusCodes.IN_PROGRESS:
             return; // already in progress
           case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-            // rethrow with a clear message so the screen can toast it
             throw new Error(
               'Google Play Services is unavailable or outdated on this device.'
             );
@@ -73,8 +75,6 @@ export function useGoogleSignIn() {
 
       console.error('Google Sign-in error:', error);
 
-      // Normalise the network failure to a friendly message, then rethrow
-      // so the calling screen can display it (e.g. via a toast).
       const isNetwork =
         error?.message === 'Network request failed' ||
         error?.message === 'Network Error';
