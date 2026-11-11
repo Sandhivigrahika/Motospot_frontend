@@ -52,7 +52,8 @@
           "locationWhenInUsePermission": "Motospot uses your location to attach an accurate pickup point to your bookings."
         }
       ],
-      "expo-build-properties"
+      "expo-build-properties",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
