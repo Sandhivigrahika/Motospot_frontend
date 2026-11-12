@@ -24,6 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import SupportRequestModal from '../components/SupportRequestModal';
 import { LinearGradient } from 'expo-linear-gradient';
 const API_URL = 'https://motospotbackend-production.up.railway.app';
+const SHOW_EMERGENCY = false; // set true to bring the Emergency card back
 
 const { width } = Dimensions.get('window');
 const BANNER_WIDTH = width - 36;
@@ -272,7 +273,7 @@ export default function HomeScreen({ navigation }: any) {
   if (loading && !user) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+        <StatusBar barStyle="light-content" />
         <View style={styles.center}>
           <View style={styles.loaderCard}>
             <ActivityIndicator size="large" color={COLORS.primary} />
@@ -287,7 +288,7 @@ export default function HomeScreen({ navigation }: any) {
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+        <StatusBar barStyle="light-content" />
         <View style={styles.center}>
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
@@ -299,7 +300,7 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="light-content" />
 
       <View style={styles.wrapper}>
         <View style={styles.headerShell}>
@@ -330,36 +331,38 @@ export default function HomeScreen({ navigation }: any) {
             />
           }
         >
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={styles.emergencyCard}
-            onPress={() => navigation.navigate('Emergency')}
-          >
-            <View style={styles.emergencyGlow} />
-            <LinearGradient
-              colors={['#FF5A5F', '#FF3B30', '#D32118']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.emergencyContent}
+          {SHOW_EMERGENCY && (
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={styles.emergencyCard}
+              onPress={() => navigation.navigate('Emergency')}
             >
-              <View style={styles.emergencyLeft}>
-                <View style={styles.emergencyIconWrap}>
-                  <Ionicons name="warning" size={22} color="#FFFFFF" />
+              <View style={styles.emergencyGlow} />
+              <LinearGradient
+                colors={['#FF5A5F', '#FF3B30', '#D32118']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emergencyContent}
+              >
+                <View style={styles.emergencyLeft}>
+                  <View style={styles.emergencyIconWrap}>
+                    <Ionicons name="warning" size={22} color="#FFFFFF" />
+                  </View>
+
+                  <View style={styles.emergencyTextBlock}>
+                    <Text style={styles.emergencyTitle}>Emergency Services</Text>
+                    <Text style={styles.emergencySubtitle}>
+                      Roadside help, urgent support, and quick access posters.
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.emergencyTextBlock}>
-                  <Text style={styles.emergencyTitle}>Emergency Services</Text>
-                  <Text style={styles.emergencySubtitle}>
-                    Roadside help, urgent support, and quick access posters.
-                  </Text>
+                <View style={styles.emergencyArrow}>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
-              </View>
-
-              <View style={styles.emergencyArrow}>
-                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
           {/* Poster carousel */}
           <View style={styles.carouselWrap}>
@@ -592,7 +595,11 @@ const styles = StyleSheet.create({
     borderRadius: 26,
   },
   bannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.10)',
   },
 
