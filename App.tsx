@@ -1,16 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as SplashScreen from 'expo-splash-screen';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { LaunchAnimation } from './src/components/LaunchAnimation';
+import { AuthTransition } from './src/components/AuthTransition';
+
+// Keep the (plain black) native splash up until LaunchAnimation takes over.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // ── Screen imports ────────────────────────────────────────────────────────────
 import LoginScreen from './src/screens/LoginScreen';
@@ -163,40 +169,41 @@ function AppStack() {
 
 function Navigation() {
   const { isAuthenticated, loading } = useAuth();
+  const [showLaunch, setShowLaunch] = useState(true);
 
-  console.log('NAV STATE', {isAuthenticated, loading});
-
-  if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: '#050505',
-        }}
-      >
-        <ActivityIndicator size="large" color="#A6F400" />
-      </View>
-    );
-  }
+  console.log('NAV STATE', { isAuthenticated, loading });
 
   return (
-    <NavigationContainer>
-      {isAuthenticated ? (
-        <AppStack />
+    <>
+      {loading ? (
+        // Plain black while the saved session loads — LaunchAnimation covers it
+        <View style={{ flex: 1, backgroundColor: '#050505' }} />
       ) : (
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: '#050505' },
-          }}
-        >
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="OTP" component={OTPScreen} />
-        </Stack.Navigator>
+        <NavigationContainer>
+          {isAuthenticated ? (
+            <AppStack />
+          ) : (
+            <Stack.Navigator
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: '#050505' },
+              }}
+            >
+              <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="OTP" component={OTPScreen} />
+            </Stack.Navigator>
+          )}
+        </NavigationContainer>
       )}
-    </NavigationContainer>
+
+      {/* After-login logo animation (Login → Home) */}
+      <AuthTransition />
+
+      {/* App-open animation; stays on top until the session has loaded */}
+      {showLaunch && (
+        <LaunchAnimation ready={!loading} onFinish={() => setShowLaunch(false)} />
+      )}
+    </>
   );
 }
 

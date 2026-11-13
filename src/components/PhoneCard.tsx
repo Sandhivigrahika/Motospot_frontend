@@ -14,7 +14,7 @@ interface PhoneCardProps {
 
 export const PhoneCard: React.FC<PhoneCardProps> = ({
     title = 'Contact Number',
-    requiredHint= 'Requred for admin to contact you',
+    requiredHint = 'Required so our team can contact you',
 }) => {
     const {
 
@@ -35,9 +35,12 @@ export const PhoneCard: React.FC<PhoneCardProps> = ({
           <>
             <View style={styles.phoneRow}>
               <Text style={styles.phoneIcon}>📱</Text>
-              <Text style={styles.phoneNumber}>{userPhone}</Text>
+              <View>
+                <Text style={styles.phoneNumber}>{userPhone}</Text>
+                <Text style={styles.phoneSaved}>✓ We'll call you on this number</Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={openPhoneEdit}>
+            <TouchableOpacity onPress={openPhoneEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={styles.phoneEditBtn}>Edit</Text>
             </TouchableOpacity>
           </>
@@ -68,7 +71,7 @@ export const PhoneCard: React.FC<PhoneCardProps> = ({
                 <TextInput
                   style={styles.phoneInputField}
                   value={phoneInput}
-                  onChangeText={(text) => setPhoneInput(text.replace(/\\D/g, '').slice(0, 10))}
+                  onChangeText={(text) => setPhoneInput(text.replace(/\D/g, '').slice(0, 10))}
                   placeholder="9876543210"
                   keyboardType="phone-pad"
                   maxLength={10}
@@ -126,6 +129,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1e293b',
     fontWeight: '500',
+  },
+
+  phoneSaved: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '600',
+    marginTop: 2,
   },
 
   phoneEditBtn: {

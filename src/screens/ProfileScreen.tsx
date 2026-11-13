@@ -368,6 +368,19 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.wrapper}>
         <View style={styles.header}>
+          {navigation.canGoBack() && (
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.85}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
+            </TouchableOpacity>
+          )}
+
           <View style={styles.headerTextWrap}>
             <Text style={styles.headerEyebrow}>PROFILE</Text>
             <Text style={styles.headerTitle}>{user?.name ?? 'User'}</Text>
@@ -642,7 +655,9 @@ export default function ProfileScreen() {
           visible={deleteModal}
           transparent
           animationType="fade"
-          onRequestClose={() => !deleteLoading && setDeleteModal(false)}
+          onRequestClose={() => {
+            if (!deleteLoading) setDeleteModal(false);
+          }}
         >
           <KeyboardAvoidingView
             style={styles.modalOverlay}
@@ -784,6 +799,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
     backgroundColor: COLORS.bg,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   headerTextWrap: {
     flex: 1,

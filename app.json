@@ -35,7 +35,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
+     "plugins": [
       "expo-secure-store",
       "expo-web-browser",
       "@react-native-community/datetimepicker",
@@ -53,7 +53,13 @@
         }
       ],
       "expo-build-properties",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000"
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -12,6 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -275,27 +276,43 @@ export default function LoginScreen({ navigation }: any) {
                 <View style={styles.dividerLine} />
               </View>
 
-              <TouchableOpacity
-                style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
-                onPress={handleGoogleLogin}
-                disabled={googleLoading || loading}
-                activeOpacity={0.85}
-              >
-                {googleLoading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
-                )}
-              </TouchableOpacity>
+              {/* Social sign-in: side by side on iOS; Google fills the row on Android
+                  (AppleSignInButton renders nothing where Apple sign-in isn't available) */}
+              <View style={styles.socialRow}>
+                <TouchableOpacity
+                  style={[styles.googleButton, googleLoading && styles.googleButtonDisabled]}
+                  onPress={handleGoogleLogin}
+                  disabled={googleLoading || loading}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sign in with Google"
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator color="#111111" />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={18} color="#111111" />
+                      <Text
+                        style={styles.googleButtonText}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                      >
+                        Sign in with Google
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
-              {/* Renders nothing on Android / devices without Apple sign-in */}
-              <AppleSignInButton
-                appearance="white"
-                height={48}
-                cornerRadius={12}
-                style={styles.appleButton}
-                onError={(msg) => showToast(msg)}
-              />
+                <AppleSignInButton
+                  variant="signIn"
+                  appearance="white"
+                  height={48}
+                  cornerRadius={12}
+                  style={styles.socialButtonSlot}
+                  onError={(msg) => showToast(msg)}
+                />
+              </View>
 
               {__DEV__ && (
                 <TouchableOpacity
@@ -402,12 +419,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.6,
   },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  socialButtonSlot: {
+    flex: 1,
+  },
+  // White to match Apple's WHITE button so the pair looks like one set
   googleButton: {
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#2f2f2f',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
+    flex: 1,
+    height: 48,
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -416,12 +442,10 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   googleButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  appleButton: {
-    marginTop: 12,
+    flexShrink: 1,
+    color: '#111111',
+    fontSize: 15,
+    fontWeight: '600',
   },
   devLoginButton: {
     marginTop: 16,

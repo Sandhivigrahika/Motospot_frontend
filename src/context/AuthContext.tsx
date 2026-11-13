@@ -1,30 +1,33 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { setupLogoutInterceptor, ejectLogoutInterceptor } from '../api/interceptors';
-import {Alert} from 'react-native';
-
+import { Alert } from 'react-native';
 
 type AuthContextType = {
-  isAuthenticated: boolean,
-  loading: boolean,
-  signIn: (token: string, refreshToken:string, user:any) => Promise<void>;
+  isAuthenticated: boolean;
+  loading: boolean;
+  /** true for the moment right after a fresh sign-in; drives <AuthTransition /> */
+  justSignedIn: boolean;
+  clearJustSignedIn: () => void;
+  signIn: (token: string, refreshToken: string, user: any) => Promise<void>;
   signOut: () => Promise<void>;
   handleSessionExpired: () => Promise<void>;
   devSignIn: () => Promise<void>;
 };
-
-
 
 const AuthContext = createContext<AuthContextType>(null as any);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [justSignedIn, setJustSignedIn] = useState(false);
   const sessionAlertShown = useRef(false);
 
-  const signOut = useCallback(async () => {
+  const clearJustSignedIn = useCallback(() => setJustSignedIn(false), []);
 
+  const signOut = useCallback(async () => {
     console.log('SIGNOUT START');
+    setJustSignedIn(false);
     setIsAuthenticated(false);
     console.log('SIGNOUT setIsAuthenticated(false);');
 
@@ -32,14 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.deleteItemAsync('accessToken');
       await SecureStore.deleteItemAsync('refreshToken');
       await SecureStore.deleteItemAsync('user');
-      console.log('SIGNOUT storage cleared')
+      console.log('SIGNOUT storage cleared');
     } catch (error) {
       console.error('Error clearing auth tokens:', error);
-    } 
+    }
   }, []);
 
   const handleSessionExpired = useCallback(async () => {
-
     if (sessionAlertShown.current) return;
 
     sessionAlertShown.current = true;
@@ -56,15 +58,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         },
       ],
-      {cancelable: false}
-    )
+      { cancelable: false }
+    );
 
-    console.log('SESSION EXPIRED HANDLER')
+    console.log('SESSION EXPIRED HANDLER');
     await signOut();
   }, [signOut]);
 
   useEffect(() => {
-    setupLogoutInterceptor( async () => {
+    setupLogoutInterceptor(async () => {
       await handleSessionExpired();
     });
 
@@ -77,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const bootstrap = async () => {
       try {
         const token = await SecureStore.getItemAsync('accessToken');
-        setIsAuthenticated(!!token);
+        setIsAuthenticated(!!token); // returning user: no after-login animation
       } catch (error) {
         console.error('Error loading auth state:', error);
         setIsAuthenticated(false);
@@ -94,6 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync('accessToken', token);
       await SecureStore.setItemAsync('refreshToken', refreshToken);
       await SecureStore.setItemAsync('user', JSON.stringify(user));
+      // Both flip in the same render, so the overlay is up before Home paints.
+      setJustSignedIn(true);
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Error storing auth tokens:', error);
@@ -113,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             name: 'Dev User',
           })
         );
+        setJustSignedIn(true);
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Error in dev sign in:', error);
@@ -125,6 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         isAuthenticated,
         loading,
+        justSignedIn,
+        clearJustSignedIn,
         signIn,
         signOut,
         handleSessionExpired,

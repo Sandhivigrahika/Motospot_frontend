@@ -1,21 +1,18 @@
-// src/hooks/usePhone.tsx
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
-import axios from 'axios';
+import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
-import { api } from '../api/client';
 
-interface StoredUser {
-  phone?: string | null;
-  [key: string]: any;
-}
+const BASE = 'https://motospotbackend-production.up.railway.app';
 
-interface PhoneUpdateResponse {
-  message: string;
-  saved_phone: string;
-}
-
-export const usePhone = () => {
+/**
+ * Phone number for the logged-in user.
+ *
+ * Source of truth on the device is the stored `user` object (same one ProfileScreen
+ * updates). We re-read it every time the screen gains focus, so a number saved on
+ * Profile shows up on Booking too, and we update it immediately after saving here.
+ */
+export function usePhone() {
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneModal, setPhoneModal] = useState(false);
@@ -24,109 +21,86 @@ export const usePhone = () => {
   const loadPhone = useCallback(async () => {
     try {
       const raw = await SecureStore.getItemAsync('user');
-
-      if (!raw) {
-        setUserPhone(null);
-        return;
-      }
-
-      const parsed: StoredUser = JSON.parse(raw);
-      setUserPhone(parsed.phone ?? null);
-    } catch (error) {
-      console.log('Failed to load phone from SecureStore:', error);
+      const user = raw ? JSON.parse(raw) : null;
+      setUserPhone(user?.phone || null);
+    } catch {
       setUserPhone(null);
     }
   }, []);
 
-  useEffect(() => {
-    loadPhone();
-  }, [loadPhone]);
+  // Refresh whenever the screen comes into view (e.g. after editing on Profile)
+  useFocusEffect(
+    useCallback(() => {
+      loadPhone();
+    }, [loadPhone])
+  );
 
-  const openPhoneEdit = useCallback(() => {
-    const digits = (userPhone ?? '').replace(/\D/g, '');
-    const editablePhone =
-      digits.startsWith('91') && digits.length > 10 ? digits.slice(-10) : digits;
-
-    setPhoneInput(editablePhone);
+  const openPhoneEdit = () => {
+    setPhoneInput((userPhone ?? '').replace(/^\+91/, ''));
     setPhoneModal(true);
-  }, [userPhone]);
+  };
 
-  const closePhoneModal = useCallback(() => {
-    setPhoneModal(false);
-    setPhoneInput('');
-  }, []);
+  const closePhoneModal = () => {
+    if (!phoneLoading) setPhoneModal(false);
+  };
 
-  const savePhone = useCallback(async () => {
-    const trimmed = phoneInput.trim();
-    const digitsOnly = trimmed.replace(/\D/g, '');
+  const savePhone = async () => {
+    const number = phoneInput.trim();
 
-    if (!digitsOnly) {
-      Alert.alert('Error', 'Please enter your phone number');
-      return;
-    }
-
-    if (digitsOnly.length !== 10) {
-      Alert.alert('Error', 'Please enter a valid 10-digit number');
+    if (!/^\d{10}$/.test(number)) {
+      Alert.alert('Invalid number', 'Enter a 10-digit phone number.');
       return;
     }
 
     setPhoneLoading(true);
 
+    let res: Response;
     try {
       const token = await SecureStore.getItemAsync('accessToken');
-
-      if (!token) {
-        return;
-      }
-
-      const method = userPhone ? 'put' : 'post';
-
-      const response = await api[method]<PhoneUpdateResponse>(
-        '/user/phone',
-        { number: digitsOnly },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const savedPhone = response.data?.saved_phone;
-
-      const raw = await SecureStore.getItemAsync('user');
-      const parsed: StoredUser = raw ? JSON.parse(raw) : {};
-      const updatedUser = { ...parsed, phone: savedPhone };
-
-      await SecureStore.setItemAsync('user', JSON.stringify(updatedUser));
-
-      setUserPhone(savedPhone ?? null);
-      setPhoneModal(false);
-      setPhoneInput('');
-      Alert.alert('Success', 'Phone number updated');
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status;
-        const detail = error.response?.data?.detail;
-
-        const isAuthError =
-          status === 401 ||
-          detail === 'Token expired' ||
-          detail === 'Could not validate credentials';
-
-        if (isAuthError) {
-          return;
-        }
-
-        Alert.alert('Error', detail || 'Something went wrong');
-        return;
-      }
-
-      Alert.alert('Error', 'Something went wrong');
-    } finally {
+      res = await fetch(`${BASE}/user/phone`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ number }),
+      });
+    } catch {
       setPhoneLoading(false);
+      Alert.alert(
+        'Connection problem',
+        'Could not reach the server. It may be waking up — try again in a moment.'
+      );
+      return;
     }
-  }, [phoneInput, userPhone]);
+
+    if (!res.ok) {
+      let message = `Something went wrong (status ${res.status})`;
+      try {
+        const data = await res.json();
+        if (typeof data?.detail === 'string') message = data.detail;
+      } catch {
+        // not JSON — keep fallback
+      }
+      setPhoneLoading(false);
+      Alert.alert('Could not save phone number', message);
+      return;
+    }
+
+    // Saved on the server → update the card right away, then persist locally
+    const saved = `+91${number}`;
+    setUserPhone(saved);
+    try {
+      const raw = await SecureStore.getItemAsync('user');
+      const user = raw ? JSON.parse(raw) : {};
+      await SecureStore.setItemAsync('user', JSON.stringify({ ...user, phone: saved }));
+    } catch {
+      // even if caching fails, the phone WAS saved on the server
+    }
+
+    setPhoneLoading(false);
+    setPhoneModal(false);
+  };
 
   return {
     userPhone,
@@ -134,9 +108,8 @@ export const usePhone = () => {
     setPhoneInput,
     phoneModal,
     phoneLoading,
-    loadPhone,
     openPhoneEdit,
     closePhoneModal,
     savePhone,
   };
-};
+}

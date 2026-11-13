@@ -23,6 +23,7 @@ import { useAddress } from '../hooks/useAddress';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SupportRequestModal from '../components/SupportRequestModal';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CascadeIn } from '../components/CascadeIn';
 const API_URL = 'https://motospotbackend-production.up.railway.app';
 const SHOW_EMERGENCY = false; // set true to bring the Emergency card back
 
@@ -252,7 +253,6 @@ export default function HomeScreen({ navigation }: any) {
 
   const renderService = (service: any) => (
     <TouchableOpacity
-      key={service.id}
       activeOpacity={0.9}
       style={styles.serviceCard}
       onPress={() => handleServicePress(service.serviceType)}
@@ -303,7 +303,7 @@ export default function HomeScreen({ navigation }: any) {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.wrapper}>
-        <View style={styles.headerShell}>
+        <CascadeIn index={0} from="top" style={styles.headerShell}>
           <View style={styles.headerRow}>
             <View style={styles.addressContainer}>
               <AddressBar
@@ -316,7 +316,7 @@ export default function HomeScreen({ navigation }: any) {
               <Ionicons name="person" size={22} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
-        </View>
+        </CascadeIn>
 
         <ScrollView
           style={styles.container}
@@ -365,7 +365,7 @@ export default function HomeScreen({ navigation }: any) {
           )}
 
           {/* Poster carousel */}
-          <View style={styles.carouselWrap}>
+          <CascadeIn index={1} style={styles.carouselWrap}>
             <FlatList
               ref={posterListRef}
               data={posters}
@@ -398,17 +398,23 @@ export default function HomeScreen({ navigation }: any) {
                 />
               ))}
             </View>
-          </View>
+          </CascadeIn>
 
-          <View style={styles.welcomeBlock}>
+          <CascadeIn index={2} style={styles.welcomeBlock}>
             <Text style={styles.welcomeTitle}>Welcome, {user.name}!</Text>
             <Text style={styles.welcomeSubtitle}>Select a service to continue....</Text>
+          </CascadeIn>
+
+          <View style={styles.servicesGrid}>
+            {services.map((service, i) => (
+              <CascadeIn key={service.id} index={3 + i} style={styles.serviceSlot}>
+                {renderService(service)}
+              </CascadeIn>
+            ))}
           </View>
 
-          <View style={styles.servicesGrid}>{services.map(renderService)}</View>
-
           {!hasBikes && (
-            <View style={styles.quickActionsCard}>
+            <CascadeIn index={3 + services.length} style={styles.quickActionsCard}>
               <Text style={styles.quickActionsTitle}>Before you book</Text>
               <Text style={styles.quickActionsText}>
                 Add your bike first so bookings are linked to the correct vehicle.
@@ -421,7 +427,7 @@ export default function HomeScreen({ navigation }: any) {
               >
                 <Text style={styles.secondaryButtonText}>Add Bike</Text>
               </TouchableOpacity>
-            </View>
+            </CascadeIn>
           )}
 
           {__DEV__ && (
@@ -623,8 +629,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  serviceCard: {
+  // Each card sits in a CascadeIn slot that takes the 48% column width
+  serviceSlot: {
     width: '48%',
+  },
+  serviceCard: {
+    width: '100%',
     minHeight: 138,
     backgroundColor: COLORS.surface,
     borderRadius: 22,

@@ -114,6 +114,11 @@ const BookingScreen = () => {
   return `${year}-${month}-${day}`;
 };
 
+  // The "General Service" entry from the backend list (name match is case-insensitive)
+  const generalService = services.find((s) => /general/i.test(s.name));
+  const isGeneralSelected =
+    !!generalService && serviceRequested === generalService.name;
+
   const selectedBikeName =
     bikes.find((b) => String(b.id) === selectedBike)?.registration_number ||
     'Tap to select bike';
@@ -378,6 +383,26 @@ const BookingScreen = () => {
             </View>
             <Ionicons name="chevron-forward" size={17} color="#cbd5e1" />
           </TouchableOpacity>
+
+          {/* Unsure what's wrong → General Service + a call from the team */}
+          <View style={styles.helpCard}>
+            <Ionicons name="call-outline" size={16} color="#0f766e" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.helpText}>
+                Not sure what's wrong? Choose <Text style={styles.helpBold}>General Service</Text> —
+                our representative will call you to understand the issue.
+              </Text>
+              {generalService && !isGeneralSelected && (
+                <TouchableOpacity
+                  onPress={() => setServiceRequested(generalService.name)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Text style={styles.helpLink}>Choose General Service</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
 
           <TouchableOpacity
             style={styles.row}
@@ -707,6 +732,15 @@ const styles = StyleSheet.create({
 
   cta: { backgroundColor: '#0D0F10', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+
+  helpCard: {
+    flexDirection: 'row', gap: 10,
+    backgroundColor: '#f0fdfa', borderWidth: 0.5, borderColor: '#ccfbf1',
+    borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 8,
+  },
+  helpText: { fontSize: 13, lineHeight: 19, color: '#115e59' },
+  helpBold: { fontWeight: '700' },
+  helpLink: { fontSize: 13, fontWeight: '700', color: '#0f766e', marginTop: 6, textDecorationLine: 'underline' },
 
   notice: { fontSize: 13, color: '#b45309', backgroundColor: '#fffbeb', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10, marginTop: 8 },
   hint: { fontSize: 12, color: '#94a3b8', marginTop: 8, marginLeft: 4 },
